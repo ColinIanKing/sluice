@@ -1,0 +1,18 @@
+Source: sluice
+Section: utils
+Priority: optional
+Maintainer: Colin King <colin.king@canonical.com>
+Uploaders: Kamal Mostafa <kamal@whence.com>
+Standards-Version: 3.9.5
+Build-Depends: debhelper (>= 7)
+Homepage: http://kernel.ubuntu.com/~cking/sluice
+
+Package: sluice
+Architecture: linux-any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: rate limiting data piping tool
+ Sluice reads from standard input and write to standard
+ output at a specified data rate.  This can be useful
+ for benchmarking and exercising I/O streaming at desired
+ throughput rates.
+

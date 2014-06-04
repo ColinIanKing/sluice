@@ -1,0 +1,69 @@
+.\"                                      Hey, EMACS: -*- nroff -*-
+.\" First parameter, NAME, should be all caps
+.\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
+.\" other parameters are allowed: see man(7), man(1)
+.TH SLUICE 1 "January 2, 2014"
+.\" Please adjust this date whenever revising the manpage.
+.\"
+.\" Some roff macros, for reference:
+.\" .nh        disable hyphenation
+.\" .hy        enable hyphenation
+.\" .ad l      left justify
+.\" .ad b      justify to both left and right margins
+.\" .nf        disable filling
+.\" .fi        enable filling
+.\" .br        insert line break
+.\" .sp <n>    insert n+1 empty lines
+.\" for manpage-specific macros, see man(7)
+.SH NAME
+sluice \- a tool to measure system events.
+.br
+
+.SH SYNOPSIS
+.B sluice
+.RI [options]
+.br
+
+.SH DESCRIPTION
+sluice is a program that reads input on stdin and outputs on stdout at
+a specified data rate.
+
+.SH OPTIONS
+sluice options are as follow:
+.TP
+.B \-h
+show help
+.TP
+.B \-m size
+specify amount of data to process, the default size is in bytes, but the K, M and G suffixes
+can specify size in Kbytes, Mbytes and Gbytes respectively.
+.TP
+.B \-i size
+specify the read/write size, the default size is in bytes, but the K, M and G suffixes
+can specify size in Kbytes, Mbytes and Gbytes respectively.
+.TP
+.B \-r rate
+specify the data rate in bytes per second. The K, M and G suffixes
+can specify the rate in Kbytes/sec, Mbytes/sec and Gbytes/sec respectively.
+.TP
+.B \-v 
+write verbose statistics to stderr
+.TP
+.B \-w 
+warn if a long burst of continuous data rate underflow occurs, the warning is issued just once.  To overcome the underflow increase the -i read/write buffer size.
+.SH EXAMPLES
+.LP
+Read /dev/zero and write in 4K sizes at the rate of 1MB/sec to the file example.dat
+.RS 8
+cat /dev/zero | sluice -i 4K -r 1M > example.dat
+.RE
+.LP
+Read 32MB from /dev/zero and write at the rate of 64K/sec to stdout with feedback on stderr 
+.RS 8
+cat /dev/zero | sluice -r 64K -v -m 32M
+.RE
+.SH AUTHOR
+sluice was written by Colin King <colin.king@canonical.com>
+.PP
+This manual page was written by Colin King <colin.king@canonical.com>,
+for the Ubuntu project (but may be used by others).

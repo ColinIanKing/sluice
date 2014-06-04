@@ -1,0 +1,5 @@
+sluice (0.01.00-1) unstable; urgency=medium
+
+  * Initial Debian release (Closes: #750546)
+
+ -- Colin King <colin.king@canonical.com>  Wed, 4 Jun 2014 11:50:11 +0100
