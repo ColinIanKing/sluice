@@ -168,6 +168,7 @@ void show_usage(void)
 	printf("  -i size   set io read/write size in bytes.\n");
 	printf("  -m size   set maximum amount to process.\n");
 	printf("  -r rate   set rate (in bytes per second).\n");
+	printf("  -u        expand read/write buffer to avoid underflow.\n");
 	printf("  -v        set verbose mode (to stderr).\n");
 	printf("  -w        warn on data rate underflow.\n");
 }
