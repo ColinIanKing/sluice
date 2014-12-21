@@ -293,10 +293,14 @@ int main(int argc, char **argv)
 			run = '+' ;
 			delay += (last_delay >> 3) + 100;
 			warnings = 0;
-		} else {
+		} else if (current_rate < (double)data_rate) {
 			run = '-' ;
 			delay -= (last_delay >> 3) - 100;
 			warnings++;
+		} else {
+			/* Unlikely.. */
+			warnings = 0;
+			run = '0';
 		}
 		if (delay < 0)
 			delay = 0;
