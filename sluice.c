@@ -154,12 +154,12 @@ void show_usage(void)
 {
 	printf("%s, version %s\n\n", APP_NAME, VERSION);
 	printf("Usage: %s [options]\n", APP_NAME);
-	printf("  -h\tprint this help.\n");
-	printf("  -i size\tset io read/write size in bytes.\n");
-	printf("  -m size\tset maximum amount to process.\n");
-	printf("  -r rate\tset rate (in bytes per second).\n");
-	printf("  -v\tset verbose mode (to stderr).\n");
-	printf("  -w\twarn on data rate underflow.\n");
+	printf("  -h        print this help.\n");
+	printf("  -i size   set io read/write size in bytes.\n");
+	printf("  -m size   set maximum amount to process.\n");
+	printf("  -r rate   set rate (in bytes per second).\n");
+	printf("  -v        set verbose mode (to stderr).\n");
+	printf("  -w        warn on data rate underflow.\n");
 }
 
 int main(int argc, char **argv)
