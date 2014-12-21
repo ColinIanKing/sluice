@@ -259,7 +259,7 @@ int main(int argc, char **argv)
 	secs_last = secs_start;
 
 	for (;;) {
-		unsigned long long int current_rate, inbufsize = 0;
+		uint64_t current_rate, inbufsize = 0;
 		bool complete = false;
 		double secs_now;
 
