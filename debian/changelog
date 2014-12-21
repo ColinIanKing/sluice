@@ -1,3 +1,20 @@
+sluice (0.01.01-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Update date on man page
+  * Update man to explain underflows
+  * Add -u option to help
+  * Convert unsigned long long ints to uint64_t
+  * Add -u overflow option
+  * Cater for zero adjustment when rate is perfect
+  * Add error check to usleep failures
+  * Check for gettimeofday failure
+  * Format -h info to look better
+  * Update debian standards version
+  * Using stdint int types
+
+ -- Colin King <colin.king@canonical.com>  Sun, 21 Dec 2014 23:47:00 +0000
+
 sluice (0.01.00-1) unstable; urgency=medium
 
   * Initial Debian release (Closes: #750546)
