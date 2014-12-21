@@ -278,8 +278,13 @@ int main(int argc, char **argv)
 		if (max_trans && total_bytes >= max_trans)
 			break;
 
-		if (delay > 0)
-			usleep(delay);
+		if (delay > 0) {
+			if (usleep(delay) < 0) {
+				fprintf(stderr, "usleep error: errno=%d (%s).\n",
+					errno, strerror(errno));
+				exit(EXIT_FAILURE);
+			}
+		}
 
 		secs_now = timeval_to_double();
 		current_rate = (uint64_t)(((double)total_bytes) / (secs_now - secs_start));
