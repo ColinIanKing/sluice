@@ -33,12 +33,18 @@
 #include <sys/stat.h>
 
 #define APP_NAME		"sluice"
+#define KB			(1024ULL)
+#define MB			(KB * KB)
+#define GB			(KB * KB * KB)
 #define UNDERFLOW_MAX		(100)
+#define UNDERFLOW_ADJUST_MAX	(10)
+#define IO_SIZE_MAX		(4 * MB)
 
 #define OPT_VERBOSE		(0x00000001)
 #define OPT_GOT_RATE		(0x00000002)
 #define OPT_GOT_IOSIZE		(0x00000004)
 #define OPT_WARNING		(0x00000008)
+#define OPT_UNDERFLOW		(0x00000010)
 
 static int opt_flags;
 
@@ -77,17 +83,17 @@ static void size_to_str(
 
 	memset(buf, 0, buflen);
 
-	if (val < 10 * 1024ULL) {
+	if (val < 10 * KB) {
 		s = (double)val;
 		units = "B";
-	} else if (val < 10 * 1024ULL * 1024ULL) {
-		s = (double)val / 1024ULL;
+	} else if (val < 10 * MB) {
+		s = (double)val / KB;
 		units = "KB";
-	} else if (val < 10 * 1024ULL * 1024ULL * 1024ULL) {
-		s = (double)val / (1024ULL * 1024ULL);
+	} else if (val < 10 * GB) {
+		s = (double)val / MB;
 		units = "MB";
 	} else {
-		s = (double)val / (1024ULL * 1024ULL * 1024ULL);
+		s = (double)val / GB;
 		units = "GB";
 	}
 	snprintf(buf, buflen, "%7.1f %s", s, units);
@@ -177,10 +183,11 @@ int main(int argc, char **argv)
 		max_trans = 0;
 	int fdin, fdout;
 	int warnings = 0;
+	int underflows = 0;
 	double secs_start, secs_last;
 
 	for (;;) {
-		int c = getopt(argc, argv, "r:h?i:vm:w");
+		int c = getopt(argc, argv, "r:h?i:vm:wu");
 		if (c == -1)
 			break;
 		switch (c) {
@@ -198,6 +205,9 @@ int main(int argc, char **argv)
 		case 'r':
 			data_rate = get_uint64_byte(optarg);
 			opt_flags |= OPT_GOT_RATE;
+			break;
+		case 'u':
+			opt_flags |= OPT_UNDERFLOW;
 			break;
 		case 'v':
 			opt_flags |= OPT_VERBOSE;
@@ -226,11 +236,11 @@ int main(int argc, char **argv)
 	if (!(opt_flags & OPT_GOT_IOSIZE)) {
 		io_size = data_rate / 32;
 		/* Make sure we don't have small sized I/O */
-		if (io_size < 1024)
-			io_size = 1024;
+		if (io_size < KB)
+			io_size = KB;
 	}
 
-	if ((io_size < 1) || (io_size > (4 * 1024 * 1024))) {
+	if ((io_size < 1) || (io_size > IO_SIZE_MAX)) {
 		fprintf(stderr, "I/O buffer size %" PRIu64 " out of range.\n",
 			io_size);
 		exit(EXIT_FAILURE);
@@ -293,20 +303,39 @@ int main(int argc, char **argv)
 			run = '+' ;
 			delay += (last_delay >> 3) + 100;
 			warnings = 0;
+			underflows = 0;
 		} else if (current_rate < (double)data_rate) {
 			run = '-' ;
 			delay -= (last_delay >> 3) - 100;
 			warnings++;
+			underflows++;
 		} else {
 			/* Unlikely.. */
 			warnings = 0;
+			underflows = 0;
 			run = '0';
 		}
 		if (delay < 0)
 			delay = 0;
 
+		if ((opt_flags & OPT_UNDERFLOW) &&
+		    (underflows > UNDERFLOW_ADJUST_MAX)) {
+			char *tmp;
+			uint64_t tmp_io_size = io_size * 2;
+
+			if (tmp_io_size < IO_SIZE_MAX) {
+				tmp = realloc(buffer, tmp_io_size);
+				if (tmp) {
+					buffer = tmp;
+					io_size = tmp_io_size;
+				}
+			}
+			underflows = 0;
+		}
+
 		/* Too many continuous underflows? */
-		if ((opt_flags & OPT_WARNING) && (warnings > UNDERFLOW_MAX)) {
+		if ((opt_flags & OPT_WARNING) &&
+		    (warnings > UNDERFLOW_MAX)) {
 			fprintf(stderr, "Warning: data underflow, "
 				"use larger I/O size (-i option)\n");
 			opt_flags &= ~OPT_WARNING;
