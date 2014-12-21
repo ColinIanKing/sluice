@@ -55,7 +55,11 @@ static inline double timeval_to_double(void)
 {
 	struct timeval tv;
 
-	gettimeofday(&tv, NULL);
+	if (gettimeofday(&tv, NULL) < 0) {
+		fprintf(stderr, "gettimeofday error: errno=%d (%s).\n",
+			errno, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
 	return (double)tv.tv_sec + ((double)tv.tv_usec / 1000000.0);
 }
 
