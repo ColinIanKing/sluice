@@ -19,16 +19,18 @@
  */
 
 #include <stdio.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
+#include <inttypes.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <ctype.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #define APP_NAME		"sluice"
 #define UNDERFLOW_MAX		(100)
@@ -41,8 +43,8 @@
 static int opt_flags;
 
 typedef struct {
-	const char ch;				/* Scaling suffix */
-	const unsigned long long int scale;	/* Amount to scale by */
+	const char ch;		/* Scaling suffix */
+	const uint64_t  scale;	/* Amount to scale by */
 } scale_t;
 
 /*
@@ -62,7 +64,7 @@ static inline double timeval_to_double(void)
  *	report size in different units
  */
 static void size_to_str(
-	const unsigned long long int val,
+	const uint64_t val,
 	char *buf,
 	const size_t buflen)
 {
@@ -88,21 +90,21 @@ static void size_to_str(
 }
 
 /*
- *  get_ull_scale()
+ *  get_uint64_scale()
  *	get a value and scale it by the given scale factor
  */
-static unsigned long long int get_ull_scale(
+static uint64_t get_uint64_scale(
 	const char *const str,
 	const scale_t scales[],
 	const char *const msg)
 {
-	unsigned long long int val;
+	uint64_t val;
 	size_t len = strlen(str);
 	int i;
 	char ch;
 
 	errno = 0;
-	val = strtoull(str, NULL, 10);
+	val = (uint64_t)strtoull(str, NULL, 10);
 	if (errno) {
 		fprintf(stderr, "Invalid value %s.\n", str);
 		exit(EXIT_FAILURE);
@@ -128,10 +130,10 @@ static unsigned long long int get_ull_scale(
 }
 
 /*
- *  get_ull_byte()
+ *  get_uint64_byte()
  *	size in bytes, K bytes, M bytes or G bytes
  */
-static unsigned long long int get_ull_byte(const char *const str)
+static uint64_t get_uint64_byte(const char *const str)
 {
 	static const scale_t scales[] = {
 		{ 'b', 	1 },
@@ -141,7 +143,7 @@ static unsigned long long int get_ull_byte(const char *const str)
 		{ 0,    0 },
 	};
 
-	return get_ull_scale(str, scales, "length");
+	return get_uint64_scale(str, scales, "length");
 }
 
 /*
@@ -164,8 +166,8 @@ int main(int argc, char **argv)
 {
 	char run = ' ';			/* Overrun/underrun flag */
 	char *buffer;			/* Temp I/O buffer */
-	int delay, last_delay = 0;	/* Delays in 1/1000000 of a second */
-	unsigned long long int io_size = 0,
+	int64_t delay, last_delay = 0;	/* Delays in 1/1000000 of a second */
+	uint64_t io_size = 0,
 		data_rate = 0,
 		total_bytes = 0,
 		max_trans = 0;
@@ -183,14 +185,14 @@ int main(int argc, char **argv)
 			show_usage();
 			exit(EXIT_SUCCESS);
 		case 'i':
-			io_size = get_ull_byte(optarg);
+			io_size = get_uint64_byte(optarg);
 			opt_flags |= OPT_GOT_IOSIZE;
 			break;
 		case 'm':
-			max_trans = get_ull_byte(optarg);
+			max_trans = get_uint64_byte(optarg);
 			break;
 		case 'r':
-			data_rate = get_ull_byte(optarg);
+			data_rate = get_uint64_byte(optarg);
 			opt_flags |= OPT_GOT_RATE;
 			break;
 		case 'v':
@@ -210,7 +212,7 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 	if (data_rate < 1) {
-		fprintf(stderr, "Rate value %llu too low.\n", data_rate);
+		fprintf(stderr, "Rate value %" PRIu64 " too low.\n", data_rate);
 		exit(EXIT_FAILURE);
 	}
 
@@ -225,12 +227,12 @@ int main(int argc, char **argv)
 	}
 
 	if ((io_size < 1) || (io_size > (4 * 1024 * 1024))) {
-		fprintf(stderr, "I/O buffer size %llu out of range.\n",
+		fprintf(stderr, "I/O buffer size %" PRIu64 " out of range.\n",
 			io_size);
 		exit(EXIT_FAILURE);
 	}
 	if ((buffer = malloc(io_size)) == NULL) {
-		fprintf(stderr,"Cannot allocate buffer of %llu bytes.\n",
+		fprintf(stderr,"Cannot allocate buffer of %" PRIu64 " bytes.\n",
 			io_size);
 		exit(EXIT_FAILURE);
 	}
@@ -248,7 +250,7 @@ int main(int argc, char **argv)
 		double secs_now;
 
 		while (!complete && (inbufsize < io_size)) {
-			unsigned long long int sz = io_size - inbufsize;
+			uint64_t sz = io_size - inbufsize;
 			/* We hit the user specified max limit to transfer */
 			if (max_trans && (total_bytes + sz) > max_trans) {
 				sz = max_trans - total_bytes;
@@ -257,7 +259,7 @@ int main(int argc, char **argv)
 
 			ssize_t n = read(fdin, buffer, (ssize_t)sz);
 			if (n < 0) {
-				fprintf(stderr,"Read error: %d, %s.\n",
+				fprintf(stderr,"Read error: errno=%d (%s).\n",
 					errno, strerror(errno));
 				exit(EXIT_FAILURE);
 			}
@@ -265,7 +267,7 @@ int main(int argc, char **argv)
 			total_bytes += n;
 		}
 		if (write(fdout, buffer, (size_t)inbufsize) < 0) {
-			fprintf(stderr,"Write error: %d, %s.\n",
+			fprintf(stderr,"Write error: errno=%d (%s).\n",
 				errno, strerror(errno));
 			exit(EXIT_FAILURE);
 		}
@@ -276,8 +278,7 @@ int main(int argc, char **argv)
 			usleep(delay);
 
 		secs_now = timeval_to_double();
-		current_rate = (unsigned long long int)
-			(((double)total_bytes) / (secs_now - secs_start));
+		current_rate = (uint64_t)(((double)total_bytes) / (secs_now - secs_start));
 
 		if (current_rate > (double)data_rate) {
 			run = '+' ;
