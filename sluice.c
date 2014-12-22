@@ -36,11 +36,15 @@
 #define KB			(1024ULL)
 #define MB			(KB * KB)
 #define GB			(KB * KB * KB)
+
 #define UNDERFLOW_MAX		(100)
 #define UNDERFLOW_ADJUST_MAX	(10)
 #define OVERFLOW_ADJUST_MAX	(10)
+
 #define IO_SIZE_MAX		(4 * MB)
 #define IO_SIZE_MIN		(1)
+
+#define DEFAULT_FREQ		(0.33333333)
 
 #define OPT_VERBOSE		(0x00000001)
 #define OPT_GOT_RATE		(0x00000002)
@@ -169,6 +173,7 @@ void show_usage(void)
 	printf("%s, version %s\n\n", APP_NAME, VERSION);
 	printf("Usage: %s [options]\n", APP_NAME);
 	printf("  -d        discard input (no output).\n");
+	printf("  -f freq   frequency of -v statistics.\n");
 	printf("  -h        print this help.\n");
 	printf("  -i size   set io read/write size in bytes.\n");
 	printf("  -m size   set maximum amount to process.\n");
@@ -194,15 +199,18 @@ int main(int argc, char **argv)
 	int warnings = 0;
 	int underflows = 0, overflows = 0;
 	int ret = EXIT_FAILURE;
-	double secs_start, secs_last;
+	double secs_start, secs_last, freq = DEFAULT_FREQ;
 
 	for (;;) {
-		int c = getopt(argc, argv, "r:h?i:vm:wudot:");
+		int c = getopt(argc, argv, "r:h?i:vm:wudot:f:");
 		if (c == -1)
 			break;
 		switch (c) {
 		case 'd':
 			opt_flags |= OPT_DISCARD;
+			break;
+		case 'f':
+			freq = atof(optarg);
 			break;
 		case '?':
 		case 'h':
@@ -246,6 +254,10 @@ int main(int argc, char **argv)
 	}
 	if (data_rate < 1) {
 		fprintf(stderr, "Rate value %" PRIu64 " too low.\n", data_rate);
+		goto tidy;
+	}
+	if (freq < 0.01) {
+		fprintf(stderr, "Frequency too low.\n");
 		goto tidy;
 	}
 
@@ -408,7 +420,7 @@ int main(int argc, char **argv)
 
 		/* Output feedback in verbose mode ~3 times a second */
 		if ((opt_flags & OPT_VERBOSE) &&
-		    (secs_now > secs_last + 0.333)) {
+		    (secs_now > secs_last + freq)) {
 			char current_rate_str[32];
 			char total_bytes_str[32];
 			char io_size_str[32];
