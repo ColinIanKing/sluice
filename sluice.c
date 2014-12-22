@@ -45,6 +45,7 @@
 #define OPT_GOT_IOSIZE		(0x00000004)
 #define OPT_WARNING		(0x00000008)
 #define OPT_UNDERFLOW		(0x00000010)
+#define OPT_DISCARD		(0x00000020)
 
 static int opt_flags;
 
@@ -164,6 +165,7 @@ void show_usage(void)
 {
 	printf("%s, version %s\n\n", APP_NAME, VERSION);
 	printf("Usage: %s [options]\n", APP_NAME);
+	printf("  -d        discard input (no output).\n");
 	printf("  -h        print this help.\n");
 	printf("  -i size   set io read/write size in bytes.\n");
 	printf("  -m size   set maximum amount to process.\n");
@@ -188,10 +190,13 @@ int main(int argc, char **argv)
 	double secs_start, secs_last;
 
 	for (;;) {
-		int c = getopt(argc, argv, "r:h?i:vm:wu");
+		int c = getopt(argc, argv, "r:h?i:vm:wud");
 		if (c == -1)
 			break;
 		switch (c) {
+		case 'd':
+			opt_flags |= OPT_DISCARD;
+			break;
 		case '?':
 		case 'h':
 			show_usage();
@@ -281,10 +286,12 @@ int main(int argc, char **argv)
 			inbufsize += n;
 			total_bytes += n;
 		}
-		if (write(fdout, buffer, (size_t)inbufsize) < 0) {
-			fprintf(stderr,"Write error: errno=%d (%s).\n",
-				errno, strerror(errno));
-			exit(EXIT_FAILURE);
+		if (!(opt_flags & OPT_DISCARD)) {
+			if (write(fdout, buffer, (size_t)inbufsize) < 0) {
+				fprintf(stderr,"Write error: errno=%d (%s).\n",
+					errno, strerror(errno));
+				exit(EXIT_FAILURE);
+			}
 		}
 		if (max_trans && total_bytes >= max_trans)
 			break;
