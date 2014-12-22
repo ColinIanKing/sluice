@@ -308,13 +308,15 @@ int main(int argc, char **argv)
 
 		while (!complete && (inbufsize < io_size)) {
 			uint64_t sz = io_size - inbufsize;
+			ssize_t n;
+
 			/* We hit the user specified max limit to transfer */
 			if (max_trans && (total_bytes + sz) > max_trans) {
 				sz = max_trans - total_bytes;
 				complete = true;
 			}
 
-			ssize_t n = read(fdin, buffer, (ssize_t)sz);
+			n = read(fdin, buffer, (ssize_t)sz);
 			if (n < 0) {
 				fprintf(stderr,"Read error: errno=%d (%s).\n",
 					errno, strerror(errno));
