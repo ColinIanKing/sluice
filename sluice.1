@@ -49,6 +49,9 @@ can specify size in Kbytes, Mbytes and Gbytes respectively.
 specify the data rate in bytes per second. The K, M and G suffixes
 can specify the rate in Kbytes/sec, Mbytes/sec and Gbytes/sec respectively.
 .TP
+.B \-t file
+tee output to the specified file. Output is written to both stdout and to the named file.
+.TP
 .B \-o 
 detect overflow and re-size read/write buffer size to try and stop overflows. This will
 shrink the buffer each time 10 consecutive overflows are detected. The buffer will not

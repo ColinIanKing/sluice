@@ -68,7 +68,7 @@ static inline double timeval_to_double(void)
 	if (gettimeofday(&tv, NULL) < 0) {
 		fprintf(stderr, "gettimeofday error: errno=%d (%s).\n",
 			errno, strerror(errno));
-		exit(EXIT_FAILURE);
+		return -1.0;
 	}
 	return (double)tv.tv_sec + ((double)tv.tv_usec / 1000000.0);
 }
@@ -174,6 +174,7 @@ void show_usage(void)
 	printf("  -m size   set maximum amount to process.\n");
 	printf("  -o        shrink read/write buffer to avoid overflow.\n");
 	printf("  -r rate   set rate (in bytes per second).\n");
+	printf("  -t file   tee output to file.\n");
 	printf("  -u        expand read/write buffer to avoid underflow.\n");
 	printf("  -v        set verbose mode (to stderr).\n");
 	printf("  -w        warn on data rate underflow.\n");
@@ -182,19 +183,21 @@ void show_usage(void)
 int main(int argc, char **argv)
 {
 	char run = ' ';			/* Overrun/underrun flag */
-	char *buffer;			/* Temp I/O buffer */
+	char *buffer = NULL;		/* Temp I/O buffer */
+	char *filename = NULL;		/* -t option filename */
 	int64_t delay, last_delay = 0;	/* Delays in 1/1000000 of a second */
 	uint64_t io_size = 0,
 		data_rate = 0,
 		total_bytes = 0,
 		max_trans = 0;
-	int fdin, fdout;
+	int fdin, fdout, fdtee = -1;
 	int warnings = 0;
 	int underflows = 0, overflows = 0;
+	int ret = EXIT_FAILURE;
 	double secs_start, secs_last;
 
 	for (;;) {
-		int c = getopt(argc, argv, "r:h?i:vm:wudo");
+		int c = getopt(argc, argv, "r:h?i:vm:wudot:");
 		if (c == -1)
 			break;
 		switch (c) {
@@ -219,6 +222,9 @@ int main(int argc, char **argv)
 			data_rate = get_uint64_byte(optarg);
 			opt_flags |= OPT_GOT_RATE;
 			break;
+		case 't':
+			filename = optarg;
+			break;
 		case 'u':
 			opt_flags |= OPT_UNDERFLOW;
 			break;
@@ -236,11 +242,22 @@ int main(int argc, char **argv)
 
 	if (!(opt_flags & OPT_GOT_RATE)) {
 		fprintf(stderr, "Must specify data rate with -r option.\n");
-		exit(EXIT_FAILURE);
+		goto tidy;
 	}
 	if (data_rate < 1) {
 		fprintf(stderr, "Rate value %" PRIu64 " too low.\n", data_rate);
-		exit(EXIT_FAILURE);
+		goto tidy;
+	}
+
+	if (filename) {
+		(void)umask(0077);
+
+		fdtee = open(filename, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
+		if (fdtee < 0) {
+			fprintf(stderr, "open on %s failed: errno = %d (%s).\n",
+				filename, errno, strerror(errno));
+			goto tidy;
+		}
 	}
 
 	/*
@@ -256,18 +273,19 @@ int main(int argc, char **argv)
 	if ((io_size < 1) || (io_size > IO_SIZE_MAX)) {
 		fprintf(stderr, "I/O buffer size %" PRIu64 " out of range.\n",
 			io_size);
-		exit(EXIT_FAILURE);
+		goto tidy;
 	}
 	if ((buffer = malloc(io_size)) == NULL) {
 		fprintf(stderr,"Cannot allocate buffer of %" PRIu64 " bytes.\n",
 			io_size);
-		exit(EXIT_FAILURE);
+		goto tidy;
 	}
 
 	fdin = fileno(stdin);
 	fdout = fileno(stdout);
 
-	secs_start = timeval_to_double();
+	if ((secs_start = timeval_to_double()) < 0)
+		goto tidy;
 	delay = (int)(((double)io_size * 1000000) / (double)data_rate);
 	secs_last = secs_start;
 
@@ -288,7 +306,7 @@ int main(int argc, char **argv)
 			if (n < 0) {
 				fprintf(stderr,"Read error: errno=%d (%s).\n",
 					errno, strerror(errno));
-				exit(EXIT_FAILURE);
+				goto tidy;
 			}
 			inbufsize += n;
 			total_bytes += n;
@@ -297,7 +315,14 @@ int main(int argc, char **argv)
 			if (write(fdout, buffer, (size_t)inbufsize) < 0) {
 				fprintf(stderr,"Write error: errno=%d (%s).\n",
 					errno, strerror(errno));
-				exit(EXIT_FAILURE);
+				goto tidy;
+			}
+		}
+		if (fdtee >= 0) {
+			if (write(fdtee, buffer, (size_t)inbufsize) < 0) {
+				fprintf(stderr,"Write error: errno=%d (%s).\n",
+					errno, strerror(errno));
+				goto tidy;
 			}
 		}
 		if (max_trans && total_bytes >= max_trans)
@@ -307,11 +332,12 @@ int main(int argc, char **argv)
 			if (usleep(delay) < 0) {
 				fprintf(stderr, "usleep error: errno=%d (%s).\n",
 					errno, strerror(errno));
-				exit(EXIT_FAILURE);
+				goto tidy;
 			}
 		}
 
-		secs_now = timeval_to_double();
+		if ((secs_now = timeval_to_double()) < 0)
+			goto tidy;
 		current_rate = (uint64_t)(((double)total_bytes) / (secs_now - secs_start));
 
 		if (current_rate > (double)data_rate) {
@@ -395,6 +421,10 @@ int main(int argc, char **argv)
 			secs_last = secs_now;
 		}
 	}
+	ret = EXIT_SUCCESS;
+tidy:
 	free(buffer);
-	exit(EXIT_SUCCESS);
+	if (fdtee >= 0)
+		(void)close(fdtee);
+	exit(ret);
 }
