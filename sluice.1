@@ -49,6 +49,11 @@ can specify size in Kbytes, Mbytes and Gbytes respectively.
 specify the data rate in bytes per second. The K, M and G suffixes
 can specify the rate in Kbytes/sec, Mbytes/sec and Gbytes/sec respectively.
 .TP
+.B \-o 
+detect overflow and re-size read/write buffer size to try and stop overflows. This will
+shrink the buffer each time 10 consecutive overflows are detected. The buffer will not
+be shrunk any less than 1 byte in size.
+.TP
 .B \-u
 detect underflow and re-size read/write buffer size to try and stop underflows. This will
 expand the buffer each time 10 consecutive underflows are detected. The buffer will not

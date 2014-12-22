@@ -38,7 +38,9 @@
 #define GB			(KB * KB * KB)
 #define UNDERFLOW_MAX		(100)
 #define UNDERFLOW_ADJUST_MAX	(10)
+#define OVERFLOW_ADJUST_MAX	(10)
 #define IO_SIZE_MAX		(4 * MB)
+#define IO_SIZE_MIN		(1)
 
 #define OPT_VERBOSE		(0x00000001)
 #define OPT_GOT_RATE		(0x00000002)
@@ -46,6 +48,7 @@
 #define OPT_WARNING		(0x00000008)
 #define OPT_UNDERFLOW		(0x00000010)
 #define OPT_DISCARD		(0x00000020)
+#define OPT_OVERFLOW		(0x00000040)
 
 static int opt_flags;
 
@@ -169,6 +172,7 @@ void show_usage(void)
 	printf("  -h        print this help.\n");
 	printf("  -i size   set io read/write size in bytes.\n");
 	printf("  -m size   set maximum amount to process.\n");
+	printf("  -o        shrink read/write buffer to avoid overflow.\n");
 	printf("  -r rate   set rate (in bytes per second).\n");
 	printf("  -u        expand read/write buffer to avoid underflow.\n");
 	printf("  -v        set verbose mode (to stderr).\n");
@@ -186,11 +190,11 @@ int main(int argc, char **argv)
 		max_trans = 0;
 	int fdin, fdout;
 	int warnings = 0;
-	int underflows = 0;
+	int underflows = 0, overflows = 0;
 	double secs_start, secs_last;
 
 	for (;;) {
-		int c = getopt(argc, argv, "r:h?i:vm:wud");
+		int c = getopt(argc, argv, "r:h?i:vm:wudo");
 		if (c == -1)
 			break;
 		switch (c) {
@@ -207,6 +211,9 @@ int main(int argc, char **argv)
 			break;
 		case 'm':
 			max_trans = get_uint64_byte(optarg);
+			break;
+		case 'o':
+			opt_flags |= OPT_OVERFLOW;
 			break;
 		case 'r':
 			data_rate = get_uint64_byte(optarg);
@@ -312,15 +319,18 @@ int main(int argc, char **argv)
 			delay += (last_delay >> 3) + 100;
 			warnings = 0;
 			underflows = 0;
+			overflows++;
 		} else if (current_rate < (double)data_rate) {
 			run = '-' ;
 			delay -= (last_delay >> 3) - 100;
 			warnings++;
 			underflows++;
+			overflows = 0;
 		} else {
 			/* Unlikely.. */
 			warnings = 0;
 			underflows = 0;
+			overflows = 0;
 			run = '0';
 		}
 		if (delay < 0)
@@ -329,7 +339,7 @@ int main(int argc, char **argv)
 		if ((opt_flags & OPT_UNDERFLOW) &&
 		    (underflows > UNDERFLOW_ADJUST_MAX)) {
 			char *tmp;
-			uint64_t tmp_io_size = io_size * 2;
+			uint64_t tmp_io_size = io_size + (io_size >> 2);
 
 			if (tmp_io_size < IO_SIZE_MAX) {
 				tmp = realloc(buffer, tmp_io_size);
@@ -339,6 +349,21 @@ int main(int argc, char **argv)
 				}
 			}
 			underflows = 0;
+		}
+
+		if ((opt_flags & OPT_OVERFLOW) &&
+		    (overflows > OVERFLOW_ADJUST_MAX)) {
+			char *tmp;
+			uint64_t tmp_io_size = io_size - (io_size >> 2);
+
+			if (tmp_io_size > IO_SIZE_MIN) {
+				tmp = realloc(buffer, tmp_io_size);
+				if (tmp) {
+					buffer = tmp;
+					io_size = tmp_io_size;
+				}
+			}
+			overflows = 0;
 		}
 
 		/* Too many continuous underflows? */
