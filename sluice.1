@@ -40,13 +40,18 @@ specify the frequency of -v verbose statistics updates. The default is 1/3 of a 
 .B \-h
 show help
 .TP
+.B \-i size
+specify the read/write size, the default size is in bytes, but the K, M and G suffixes
+can specify size in Kbytes, Mbytes and Gbytes respectively.
+.TP
 .B \-m size
 specify amount of data to process, the default size is in bytes, but the K, M and G suffixes
 can specify size in Kbytes, Mbytes and Gbytes respectively.
 .TP
-.B \-i size
-specify the read/write size, the default size is in bytes, but the K, M and G suffixes
-can specify size in Kbytes, Mbytes and Gbytes respectively.
+.B \-o 
+detect overflow and re-size read/write buffer size to try and stop overflows. This will
+shrink the buffer each time 10 consecutive overflows are detected. The buffer will not
+be shrunk any less than 1 byte in size.
 .TP
 .B \-r rate
 specify the data rate in bytes per second. The K, M and G suffixes
@@ -54,11 +59,6 @@ can specify the rate in Kbytes/sec, Mbytes/sec and Gbytes/sec respectively.
 .TP
 .B \-t file
 tee output to the specified file. Output is written to both stdout and to the named file.
-.TP
-.B \-o 
-detect overflow and re-size read/write buffer size to try and stop overflows. This will
-shrink the buffer each time 10 consecutive overflows are detected. The buffer will not
-be shrunk any less than 1 byte in size.
 .TP
 .B \-u
 detect underflow and re-size read/write buffer size to try and stop underflows. This will
