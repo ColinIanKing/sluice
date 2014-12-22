@@ -407,16 +407,19 @@ int main(int argc, char **argv)
 		    (secs_now > secs_last + 0.333)) {
 			char current_rate_str[32];
 			char total_bytes_str[32];
+			char io_size_str[32];
 
 			size_to_str(current_rate, current_rate_str,
 				sizeof(current_rate_str));
 			size_to_str(total_bytes, total_bytes_str,
 				sizeof(total_bytes_str));
+			size_to_str(io_size, io_size_str,
+				sizeof(io_size_str));
 
-			fprintf(stderr,"Rate: %s/sec, Adjust: %c, "
-				"Total: %s, Duration: %.1f secs  \r",
+			fprintf(stderr,"Rate: %s/S, Adj: %c, "
+				"Total: %s, Dur: %.1f S, Buf: %s  \r",
 				current_rate_str, run, total_bytes_str,
-				secs_now - secs_start);
+				secs_now - secs_start, io_size_str);
 			fflush(stderr);
 			secs_last = secs_now;
 		}
