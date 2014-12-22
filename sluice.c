@@ -367,6 +367,10 @@ int main(int argc, char **argv)
 			char *tmp;
 			uint64_t tmp_io_size = io_size + (io_size >> 2);
 
+			/* If size is too small, we get stuck at 1 */
+			if (tmp_io_size < 4)
+				tmp_io_size = 4;
+
 			if (tmp_io_size < IO_SIZE_MAX) {
 				tmp = realloc(buffer, tmp_io_size);
 				if (tmp) {
