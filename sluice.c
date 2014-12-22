@@ -32,7 +32,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#define APP_NAME		"sluice"
 #define KB			(1024ULL)
 #define MB			(KB * KB)
 #define GB			(KB * KB * KB)
@@ -55,6 +54,7 @@
 #define OPT_OVERFLOW		(0x00000040)
 
 static int opt_flags;
+static const char *app_name = "sluice";
 
 typedef struct {
 	const char ch;		/* Scaling suffix */
@@ -170,8 +170,8 @@ static uint64_t get_uint64_byte(const char *const str)
  */
 void show_usage(void)
 {
-	printf("%s, version %s\n\n", APP_NAME, VERSION);
-	printf("Usage: %s [options]\n", APP_NAME);
+	printf("%s, version %s\n\n", app_name, VERSION);
+	printf("Usage: %s [options]\n", app_name);
 	printf("  -d        discard input (no output).\n");
 	printf("  -f freq   frequency of -v statistics.\n");
 	printf("  -h        print this help.\n");
