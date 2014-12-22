@@ -6,7 +6,7 @@ BINDIR=/usr/bin
 MANDIR=/usr/share/man/man1
 
 sluice: sluice.o
-	$(CC) $(CFLAGS) $< -lm -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
 
 sluice.1.gz: sluice.1
 	gzip -c $< > $@
