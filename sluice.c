@@ -188,7 +188,7 @@ static uint64_t get_uint64_byte(const char *const str)
  *  show_usage()
  *	show options
  */
-void show_usage(void)
+static void show_usage(void)
 {
 	printf("%s, version %s\n\n", app_name, VERSION);
 	printf("Usage: %s [options]\n", app_name);
