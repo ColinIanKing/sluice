@@ -1,3 +1,11 @@
+sluice (0.01.05-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Add -c constant write speed option
+  * Make help info function static
+
+ -- Colin King <colin.king@canonical.com>  Tue, 23 Dec 2014 16:30:00 +0000
+
 sluice (0.01.04-1) unstable; urgency=medium
 
   * Makefile: bump version
