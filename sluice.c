@@ -52,6 +52,7 @@
 #define OPT_UNDERFLOW		(0x00000010)
 #define OPT_DISCARD		(0x00000020)
 #define OPT_OVERFLOW		(0x00000040)
+#define OPT_ZERO		(0x00000080)
 
 static int opt_flags;
 static const char *app_name = "sluice";
@@ -183,6 +184,7 @@ void show_usage(void)
 	printf("  -u        expand read/write buffer to avoid underflow.\n");
 	printf("  -v        set verbose mode (to stderr).\n");
 	printf("  -w        warn on data rate underflow.\n");
+	printf("  -z        ignore stdin, generate zeros.\n");
 }
 
 int main(int argc, char **argv)
@@ -202,7 +204,7 @@ int main(int argc, char **argv)
 	double secs_start, secs_last, freq = DEFAULT_FREQ;
 
 	for (;;) {
-		int c = getopt(argc, argv, "r:h?i:vm:wudot:f:");
+		int c = getopt(argc, argv, "r:h?i:vm:wudot:f:z");
 		if (c == -1)
 			break;
 		switch (c) {
@@ -241,6 +243,9 @@ int main(int argc, char **argv)
 			break;
 		case 'w':
 			opt_flags |= OPT_WARNING;
+			break;
+		case 'z':
+			opt_flags |= OPT_ZERO;
 			break;
 		default:
 			show_usage();
@@ -292,6 +297,8 @@ int main(int argc, char **argv)
 			io_size);
 		goto tidy;
 	}
+	if (opt_flags & OPT_ZERO)
+		memset(buffer, 0, io_size);
 
 	fdin = fileno(stdin);
 	fdout = fileno(stdout);
@@ -306,24 +313,29 @@ int main(int argc, char **argv)
 		bool complete = false;
 		double secs_now;
 
-		while (!complete && (inbufsize < io_size)) {
-			uint64_t sz = io_size - inbufsize;
-			ssize_t n;
+		if (opt_flags & OPT_ZERO) {
+			inbufsize = io_size;
+			total_bytes += io_size;
+		} else {
+			while (!complete && (inbufsize < io_size)) {
+				uint64_t sz = io_size - inbufsize;
+				ssize_t n;
 
-			/* We hit the user specified max limit to transfer */
-			if (max_trans && (total_bytes + sz) > max_trans) {
-				sz = max_trans - total_bytes;
-				complete = true;
-			}
+				/* We hit the user specified max limit to transfer */
+				if (max_trans && (total_bytes + sz) > max_trans) {
+					sz = max_trans - total_bytes;
+					complete = true;
+				}
 
-			n = read(fdin, buffer, (ssize_t)sz);
-			if (n < 0) {
-				fprintf(stderr,"Read error: errno=%d (%s).\n",
-					errno, strerror(errno));
-				goto tidy;
+				n = read(fdin, buffer, (ssize_t)sz);
+				if (n < 0) {
+					fprintf(stderr,"Read error: errno=%d (%s).\n",
+						errno, strerror(errno));
+					goto tidy;
+				}
+				inbufsize += n;
+				total_bytes += n;
 			}
-			inbufsize += n;
-			total_bytes += n;
 		}
 		if (!(opt_flags & OPT_DISCARD)) {
 			if (write(fdout, buffer, (size_t)inbufsize) < 0) {
@@ -388,6 +400,8 @@ int main(int argc, char **argv)
 			if (tmp_io_size < IO_SIZE_MAX) {
 				tmp = realloc(buffer, tmp_io_size);
 				if (tmp) {
+					if (opt_flags & OPT_ZERO)
+						memset(tmp, 0, tmp_io_size);
 					buffer = tmp;
 					io_size = tmp_io_size;
 				}
@@ -403,6 +417,8 @@ int main(int argc, char **argv)
 			if (tmp_io_size > IO_SIZE_MIN) {
 				tmp = realloc(buffer, tmp_io_size);
 				if (tmp) {
+					if (opt_flags & OPT_ZERO)
+						memset(tmp, 0, tmp_io_size);
 					buffer = tmp;
 					io_size = tmp_io_size;
 				}

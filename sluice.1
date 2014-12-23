@@ -48,7 +48,7 @@ can specify size in Kbytes, Mbytes and Gbytes respectively.
 specify amount of data to process, the default size is in bytes, but the K, M and G suffixes
 can specify size in Kbytes, Mbytes and Gbytes respectively.
 .TP
-.B \-o 
+.B \-o
 detect overflow and re-size read/write buffer size to try and stop overflows. This will
 shrink the buffer each time 10 consecutive overflows are detected. The buffer will not
 be shrunk any less than 1 byte in size.
@@ -65,11 +65,14 @@ detect underflow and re-size read/write buffer size to try and stop underflows. 
 expand the buffer each time 10 consecutive underflows are detected. The buffer will not
 be expanded any more than 4MB in size.
 .TP
-.B \-v 
+.B \-v
 write verbose statistics to stderr
 .TP
-.B \-w 
+.B \-w
 warn if a long burst of continuous data rate underflow occurs, the warning is issued just once.  To overcome the underflow increase the \-i read/write buffer size or use the \-u option to auto-expand the read/write buffer.
+.TP
+.B \-z
+don't read from stdin, instead generate a stream of zeros.
 .SH EXAMPLES
 .LP
 Read /dev/zero and write in 4K sizes at the rate of 1MB/sec to the file example.dat
@@ -77,10 +80,15 @@ Read /dev/zero and write in 4K sizes at the rate of 1MB/sec to the file example.
 cat /dev/zero | sluice \-i 4K \-r 1M > example.dat
 .RE
 .LP
-Read 32MB from /dev/zero and write at the rate of 64K/sec to stdout with feedback on stderr 
+Read 32MB from /dev/zero and write at the rate of 64K/sec to stdout with feedback on stderr
 .RS 8
 cat /dev/zero | sluice \-r 64K \-v \-m 32M
 .RE
+.LP
+Generate a stream of zeros and write at a rate of 1MB/sec to a fifo with underflow and overflow buffer
+management
+.RS 8
+sluice \-z \-u \-o \-r 1MB -d -t myfifo
 .SH AUTHOR
 sluice was written by Colin King <colin.king@canonical.com>
 .PP
