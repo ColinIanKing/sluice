@@ -40,6 +40,9 @@
 #define UNDERFLOW_ADJUST_MAX	(10)
 #define OVERFLOW_ADJUST_MAX	(10)
 
+#define DELAY_SHIFT_MIN		(1)
+#define DELAY_SHIFT_MAX		(16)
+
 #define IO_SIZE_MAX		(MB * 64)
 #define IO_SIZE_MIN		(1)
 
@@ -112,6 +115,28 @@ static void size_to_str(
 }
 
 /*
+ *  get_uint64()
+ *	get a uint64 valu
+ */
+static uint64_t get_uint64(const char *const str, size_t *len)
+{
+	uint64_t val;
+	*len = strlen(str);
+
+	errno = 0;
+	val = (uint64_t)strtoull(str, NULL, 10);
+	if (errno) {
+		fprintf(stderr, "Invalid value %s.\n", str);
+		exit(EXIT_FAILURE);
+	}
+	if (*len == 0) {
+		fprintf(stderr, "Value %s is an invalid size.\n", str);
+		exit(EXIT_FAILURE);
+	}
+	return val;
+}
+
+/*
  *  get_uint64_scale()
  *	get a value and scale it by the given scale factor
  */
@@ -125,16 +150,7 @@ static uint64_t get_uint64_scale(
 	int i;
 	char ch;
 
-	errno = 0;
-	val = (uint64_t)strtoull(str, NULL, 10);
-	if (errno) {
-		fprintf(stderr, "Invalid value %s.\n", str);
-		exit(EXIT_FAILURE);
-	}
-	if (len == 0) {
-		fprintf(stderr, "Value %s is an invalid size.\n", str);
-		exit(EXIT_FAILURE);
-	}
+	val = get_uint64(str, &len);
 	len--;
 	ch = str[len];
 
@@ -184,6 +200,7 @@ void show_usage(void)
 	printf("  -o        shrink read/write buffer to avoid overflow.\n");
 	printf("  -r rate   set rate (in bytes per second).\n");
 	printf("  -R	    ignore stdin, read from %s.\n", dev_urandom);
+	printf("  -s shift  delay shift, controls delay adjustment.\n");
 	printf("  -t file   tee output to file.\n");
 	printf("  -u        expand read/write buffer to avoid underflow.\n");
 	printf("  -v        set verbose mode (to stderr).\n");
@@ -200,7 +217,8 @@ int main(int argc, char **argv)
 	uint64_t io_size = 0,
 		data_rate = 0,
 		total_bytes = 0,
-		max_trans = 0;
+		max_trans = 0,
+		delay_shift = 3;
 	int fdin = -1, fdout, fdtee = -1;
 	int warnings = 0;
 	int underflows = 0, overflows = 0;
@@ -208,7 +226,8 @@ int main(int argc, char **argv)
 	double secs_start, secs_last, freq = DEFAULT_FREQ;
 
 	for (;;) {
-		int c = getopt(argc, argv, "r:h?i:vm:wudot:f:zR");
+		size_t len;
+		int c = getopt(argc, argv, "r:h?i:vm:wudot:f:zRs:");
 		if (c == -1)
 			break;
 		switch (c) {
@@ -238,6 +257,9 @@ int main(int argc, char **argv)
 			break;
 		case 'R':
 			opt_flags |= OPT_URANDOM;
+			break;
+		case 's':
+			delay_shift = get_uint64(optarg, &len);
 			break;
 		case 't':
 			filename = optarg;
@@ -272,7 +294,11 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Frequency too low.\n");
 		goto tidy;
 	}
-
+	if (delay_shift < DELAY_SHIFT_MIN || delay_shift > DELAY_SHIFT_MAX) {
+		fprintf(stderr, "Delay shift must be %d..%d.\n",
+			DELAY_SHIFT_MIN, DELAY_SHIFT_MAX);
+		goto tidy;
+	}
 
 	/*
 	 *  No size specified, then default to rate / 32
@@ -395,13 +421,13 @@ int main(int argc, char **argv)
 
 		if (current_rate > (double)data_rate) {
 			run = '+' ;
-			delay += (last_delay >> 3) + 100;
+			delay += ((last_delay >> delay_shift) + 100);
 			warnings = 0;
 			underflows = 0;
 			overflows++;
 		} else if (current_rate < (double)data_rate) {
 			run = '-' ;
-			delay -= (last_delay >> 3) - 100;
+			delay -= ((last_delay >> delay_shift) + 100);
 			warnings++;
 			underflows++;
 			overflows = 0;

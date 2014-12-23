@@ -60,6 +60,14 @@ can specify the rate in Kbytes/sec, Mbytes/sec and Gbytes/sec respectively.
 .B \-R
 don't read from stdin, instead generate a stream of random data from /dev/urandom.
 .TP
+.B \-s shift
+modify the delay shift. The delay between each write is controlled by modifying the
+previous delay by adding or subtracting the previous delay right shifted by the shift
+value.  The larger the shift value the longer it takes to adjust up/down to the
+specified rate.  The smaller the shift value the quicker it takes, however, this can
+result in a highly fluctuating rate because the delay varies by a large amount causing
+over overshoot and undershoot.  The default value is 3 and works well for most rates.
+.TP
 .B \-t file
 tee output to the specified file. Output is written to both stdout and to the named file.
 .TP
