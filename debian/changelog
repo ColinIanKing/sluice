@@ -1,3 +1,13 @@
+sluice (0.01.04-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Add shift delay tweakable with the -s option
+  * Add -R random option
+  * Increase I/O size, check for oversized rate
+  * Add -z option
+
+ -- Colin King <colin.king@canonical.com>  Tue, 23 Dec 2014 11:08:00 +0000
+
 sluice (0.01.03-1) unstable; urgency=medium
 
   * Makefile: bump version again
