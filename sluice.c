@@ -40,7 +40,7 @@
 #define UNDERFLOW_ADJUST_MAX	(10)
 #define OVERFLOW_ADJUST_MAX	(10)
 
-#define IO_SIZE_MAX		(4 * MB)
+#define IO_SIZE_MAX		(MB * 64)
 #define IO_SIZE_MIN		(1)
 
 #define DEFAULT_FREQ		(0.33333333)
@@ -266,16 +266,6 @@ int main(int argc, char **argv)
 		goto tidy;
 	}
 
-	if (filename) {
-		(void)umask(0077);
-
-		fdtee = open(filename, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
-		if (fdtee < 0) {
-			fprintf(stderr, "open on %s failed: errno = %d (%s).\n",
-				filename, errno, strerror(errno));
-			goto tidy;
-		}
-	}
 
 	/*
 	 *  No size specified, then default to rate / 32
@@ -285,6 +275,11 @@ int main(int argc, char **argv)
 		/* Make sure we don't have small sized I/O */
 		if (io_size < KB)
 			io_size = KB;
+		if (io_size > IO_SIZE_MAX) {
+			fprintf(stderr, "Rate too high, maximum allowed: %" PRIu64 ".\n",
+				(uint64_t)IO_SIZE_MAX * 32);
+			goto tidy;
+		}
 	}
 
 	if ((io_size < 1) || (io_size > IO_SIZE_MAX)) {
@@ -300,6 +295,16 @@ int main(int argc, char **argv)
 	if (opt_flags & OPT_ZERO)
 		memset(buffer, 0, io_size);
 
+	if (filename) {
+		(void)umask(0077);
+
+		fdtee = open(filename, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
+		if (fdtee < 0) {
+			fprintf(stderr, "open on %s failed: errno = %d (%s).\n",
+				filename, errno, strerror(errno));
+			goto tidy;
+		}
+	}
 	fdin = fileno(stdin);
 	fdout = fileno(stdout);
 
