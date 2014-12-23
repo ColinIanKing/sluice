@@ -53,9 +53,12 @@
 #define OPT_DISCARD		(0x00000020)
 #define OPT_OVERFLOW		(0x00000040)
 #define OPT_ZERO		(0x00000080)
+#define OPT_URANDOM		(0x00000100)
+
 
 static int opt_flags;
 static const char *app_name = "sluice";
+static const char *dev_urandom = "/dev/urandom";
 
 typedef struct {
 	const char ch;		/* Scaling suffix */
@@ -180,6 +183,7 @@ void show_usage(void)
 	printf("  -m size   set maximum amount to process.\n");
 	printf("  -o        shrink read/write buffer to avoid overflow.\n");
 	printf("  -r rate   set rate (in bytes per second).\n");
+	printf("  -R	    ignore stdin, read from %s.\n", dev_urandom);
 	printf("  -t file   tee output to file.\n");
 	printf("  -u        expand read/write buffer to avoid underflow.\n");
 	printf("  -v        set verbose mode (to stderr).\n");
@@ -197,14 +201,14 @@ int main(int argc, char **argv)
 		data_rate = 0,
 		total_bytes = 0,
 		max_trans = 0;
-	int fdin, fdout, fdtee = -1;
+	int fdin = -1, fdout, fdtee = -1;
 	int warnings = 0;
 	int underflows = 0, overflows = 0;
 	int ret = EXIT_FAILURE;
 	double secs_start, secs_last, freq = DEFAULT_FREQ;
 
 	for (;;) {
-		int c = getopt(argc, argv, "r:h?i:vm:wudot:f:z");
+		int c = getopt(argc, argv, "r:h?i:vm:wudot:f:zR");
 		if (c == -1)
 			break;
 		switch (c) {
@@ -231,6 +235,9 @@ int main(int argc, char **argv)
 		case 'r':
 			data_rate = get_uint64_byte(optarg);
 			opt_flags |= OPT_GOT_RATE;
+			break;
+		case 'R':
+			opt_flags |= OPT_URANDOM;
 			break;
 		case 't':
 			filename = optarg;
@@ -295,6 +302,12 @@ int main(int argc, char **argv)
 	if (opt_flags & OPT_ZERO)
 		memset(buffer, 0, io_size);
 
+	if ((opt_flags & (OPT_ZERO | OPT_URANDOM)) ==
+		(OPT_ZERO | OPT_URANDOM)) {
+		fprintf(stderr, "Cannot use both -z and -R options together.\n");
+		goto tidy;
+	}
+
 	if (filename) {
 		(void)umask(0077);
 
@@ -305,7 +318,16 @@ int main(int argc, char **argv)
 			goto tidy;
 		}
 	}
-	fdin = fileno(stdin);
+	if (opt_flags & OPT_URANDOM) {
+		fdin = open(dev_urandom, O_RDONLY);
+		if (fdin < 0) {
+			fprintf(stderr, "Cannot open %s: errno=%d (%s).\n",
+				dev_urandom, errno, strerror(errno));
+			goto tidy;
+		}
+	} else {
+		fdin = fileno(stdin);
+	}
 	fdout = fileno(stdout);
 
 	if ((secs_start = timeval_to_double()) < 0)
@@ -465,6 +487,9 @@ int main(int argc, char **argv)
 	}
 	ret = EXIT_SUCCESS;
 tidy:
+	if ((fdin != -1) && (opt_flags & OPT_URANDOM)) {
+		(void)close(fdin);
+	}
 	free(buffer);
 	if (fdtee >= 0)
 		(void)close(fdtee);

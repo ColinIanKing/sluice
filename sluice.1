@@ -57,6 +57,9 @@ be shrunk any less than 1 byte in size.
 specify the data rate in bytes per second. The K, M and G suffixes
 can specify the rate in Kbytes/sec, Mbytes/sec and Gbytes/sec respectively.
 .TP
+.B \-R
+don't read from stdin, instead generate a stream of random data from /dev/urandom.
+.TP
 .B \-t file
 tee output to the specified file. Output is written to both stdout and to the named file.
 .TP
