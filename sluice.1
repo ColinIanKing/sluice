@@ -31,6 +31,13 @@ a specified data rate.
 .SH OPTIONS
 sluice options are as follow:
 .TP
+.B \-c delay
+define constant delay time (in seconds) between writes. This option enables a constant
+time between writes and adjusts the buffer size to try and keep the data rate
+constant.  This option is mutually exclusive to the \-i option.  This implicitly
+enables the \-o (overflow) and \-u (underflow) buffer management options to
+keep the data rate constant.
+.TP
 .B \-d
 discard data, do not copy it to stdout. This makes sluice act as a data sink.
 .TP
@@ -42,7 +49,9 @@ show help
 .TP
 .B \-i size
 specify the read/write size, the default size is in bytes, but the K, M and G suffixes
-can specify size in Kbytes, Mbytes and Gbytes respectively.
+can specify size in Kbytes, Mbytes and Gbytes respectively. By specifying
+a fixed buffer size means that this option is mutually exclusive to the \-c
+option.
 .TP
 .B \-m size
 specify amount of data to process, the default size is in bytes, but the K, M and G suffixes
@@ -100,6 +109,12 @@ Generate a stream of zeros and write at a rate of 1MB/sec to a fifo with underfl
 management
 .RS 8
 sluice \-z \-u \-o \-r 1MB -d -t myfifo
+.RE
+.LP
+Write random data at 5MB per second to file myfile doing a write every 0.1 seconds
+.RS 8
+sluice -R -r 5M -c 0.1 > myfile
+.RE
 .SH AUTHOR
 sluice was written by Colin King <colin.king@canonical.com>
 .PP

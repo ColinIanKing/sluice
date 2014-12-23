@@ -46,18 +46,21 @@
 #define IO_SIZE_MAX		(MB * 64)
 #define IO_SIZE_MIN		(1)
 
+#define DELAY_MIN		(0.01)
+#define DELAY_MAX		(10.00)
+
 #define DEFAULT_FREQ		(0.33333333)
 
 #define OPT_VERBOSE		(0x00000001)
 #define OPT_GOT_RATE		(0x00000002)
 #define OPT_GOT_IOSIZE		(0x00000004)
-#define OPT_WARNING		(0x00000008)
-#define OPT_UNDERFLOW		(0x00000010)
-#define OPT_DISCARD		(0x00000020)
-#define OPT_OVERFLOW		(0x00000040)
-#define OPT_ZERO		(0x00000080)
-#define OPT_URANDOM		(0x00000100)
-
+#define OPT_GOT_CONST_DELAY	(0x00000008)
+#define OPT_WARNING		(0x00000010)
+#define OPT_UNDERFLOW		(0x00000020)
+#define OPT_DISCARD		(0x00000040)
+#define OPT_OVERFLOW		(0x00000080)
+#define OPT_ZERO		(0x00000100)
+#define OPT_URANDOM		(0x00000200)
 
 static int opt_flags;
 static const char *app_name = "sluice";
@@ -192,6 +195,7 @@ static void show_usage(void)
 {
 	printf("%s, version %s\n\n", app_name, VERSION);
 	printf("Usage: %s [options]\n", app_name);
+	printf("  -c delay  specify constant delay time (seconds).\n");
 	printf("  -d        discard input (no output).\n");
 	printf("  -f freq   frequency of -v statistics.\n");
 	printf("  -h        print this help.\n");
@@ -214,23 +218,34 @@ int main(int argc, char **argv)
 	char *buffer = NULL;		/* Temp I/O buffer */
 	char *filename = NULL;		/* -t option filename */
 	int64_t delay, last_delay = 0;	/* Delays in 1/1000000 of a second */
-	uint64_t io_size = 0,
-		data_rate = 0,
-		total_bytes = 0,
-		max_trans = 0,
-		delay_shift = 3;
+	uint64_t io_size = 0;
+	uint64_t data_rate = 0;
+	uint64_t total_bytes = 0;
+	uint64_t max_trans = 0;
+	uint64_t delay_shift = 3;
+	int underflow_adjust = UNDERFLOW_ADJUST_MAX;
+	int overflow_adjust = OVERFLOW_ADJUST_MAX;
 	int fdin = -1, fdout, fdtee = -1;
 	int warnings = 0;
 	int underflows = 0, overflows = 0;
 	int ret = EXIT_FAILURE;
 	double secs_start, secs_last, freq = DEFAULT_FREQ;
+	double const_delay = -1.0;
 
 	for (;;) {
 		size_t len;
-		int c = getopt(argc, argv, "r:h?i:vm:wudot:f:zRs:");
+		int c = getopt(argc, argv, "r:h?i:vm:wudot:f:zRs:c:");
 		if (c == -1)
 			break;
 		switch (c) {
+		case 'c':
+			opt_flags |= (OPT_GOT_CONST_DELAY |
+				      OPT_UNDERFLOW |
+				      OPT_OVERFLOW);
+			const_delay = atof(optarg);
+			underflow_adjust = 1;
+			overflow_adjust = 1;
+			break;
 		case 'd':
 			opt_flags |= OPT_DISCARD;
 			break;
@@ -286,6 +301,11 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Must specify data rate with -r option.\n");
 		goto tidy;
 	}
+	if ((opt_flags & (OPT_GOT_IOSIZE | OPT_GOT_CONST_DELAY)) ==
+	    (OPT_GOT_IOSIZE | OPT_GOT_CONST_DELAY)) {
+		fprintf(stderr, "Cannot use both -i and -c options together.\n");
+		goto tidy;
+	}
 	if (data_rate < 1) {
 		fprintf(stderr, "Rate value %" PRIu64 " too low.\n", data_rate);
 		goto tidy;
@@ -295,23 +315,42 @@ int main(int argc, char **argv)
 		goto tidy;
 	}
 	if (delay_shift < DELAY_SHIFT_MIN || delay_shift > DELAY_SHIFT_MAX) {
-		fprintf(stderr, "Delay shift must be %d..%d.\n",
+		fprintf(stderr, "Delay shift must be %d .. %d.\n",
 			DELAY_SHIFT_MIN, DELAY_SHIFT_MAX);
+		goto tidy;
+	}
+	if ((opt_flags & OPT_GOT_CONST_DELAY) &&
+	    (const_delay < DELAY_MIN || const_delay > DELAY_MAX)) {
+		fprintf(stderr, "Delay time must be %.2f .. %.2f seconds.\n",
+			DELAY_MIN, DELAY_MAX);
 		goto tidy;
 	}
 
 	/*
-	 *  No size specified, then default to rate / 32
+	 *  No size specified, then default rate
 	 */
 	if (!(opt_flags & OPT_GOT_IOSIZE)) {
-		io_size = data_rate / 32;
-		/* Make sure we don't have small sized I/O */
-		if (io_size < KB)
-			io_size = KB;
-		if (io_size > IO_SIZE_MAX) {
-			fprintf(stderr, "Rate too high, maximum allowed: %" PRIu64 ".\n",
-				(uint64_t)IO_SIZE_MAX * 32);
-			goto tidy;
+		if (opt_flags & OPT_GOT_CONST_DELAY) {
+			io_size = (KB * data_rate * const_delay) / KB;
+			if (io_size < 1) {
+				fprintf(stderr, "Delay too small, internal buffer too small.\n");
+				goto tidy;
+			}
+			if (io_size > IO_SIZE_MAX) {
+				fprintf(stderr, "Delay too large, internal buffer too big.\n");
+				goto tidy;
+			}
+		}
+		else {
+			io_size = data_rate / 32;
+			/* Make sure we don't have small sized I/O */
+			if (io_size < KB)
+				io_size = KB;
+			if (io_size > IO_SIZE_MAX) {
+				fprintf(stderr, "Rate too high, maximum allowed: %" PRIu64 ".\n",
+					(uint64_t)IO_SIZE_MAX * 32);
+				goto tidy;
+			}
 		}
 	}
 
@@ -358,7 +397,11 @@ int main(int argc, char **argv)
 
 	if ((secs_start = timeval_to_double()) < 0)
 		goto tidy;
-	delay = (int)(((double)io_size * 1000000) / (double)data_rate);
+
+	if (opt_flags & OPT_GOT_CONST_DELAY)
+		delay = 1000000 * const_delay;
+	else
+		delay = (int)(((double)io_size * 1000000) / (double)data_rate);
 	secs_last = secs_start;
 
 	for (;;) {
@@ -421,13 +464,15 @@ int main(int argc, char **argv)
 
 		if (current_rate > (double)data_rate) {
 			run = '+' ;
-			delay += ((last_delay >> delay_shift) + 100);
+			if (!(opt_flags & OPT_GOT_CONST_DELAY))
+				delay += ((last_delay >> delay_shift) + 100);
 			warnings = 0;
 			underflows = 0;
 			overflows++;
 		} else if (current_rate < (double)data_rate) {
 			run = '-' ;
-			delay -= ((last_delay >> delay_shift) + 100);
+			if (!(opt_flags & OPT_GOT_CONST_DELAY))
+				delay -= ((last_delay >> delay_shift) + 100);
 			warnings++;
 			underflows++;
 			overflows = 0;
@@ -442,7 +487,7 @@ int main(int argc, char **argv)
 			delay = 0;
 
 		if ((opt_flags & OPT_UNDERFLOW) &&
-		    (underflows > UNDERFLOW_ADJUST_MAX)) {
+		    (underflows > underflow_adjust)) {
 			char *tmp;
 			uint64_t tmp_io_size = io_size + (io_size >> 2);
 
@@ -463,7 +508,7 @@ int main(int argc, char **argv)
 		}
 
 		if ((opt_flags & OPT_OVERFLOW) &&
-		    (overflows > OVERFLOW_ADJUST_MAX)) {
+		    (overflows > overflow_adjust)) {
 			char *tmp;
 			uint64_t tmp_io_size = io_size - (io_size >> 2);
 
