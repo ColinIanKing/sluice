@@ -563,7 +563,7 @@ int main(int argc, char **argv)
 				"Total: %s, Dur: %.1f S, Buf: %s  \r",
 				current_rate_str, run, total_bytes_str,
 				secs_now - secs_start, io_size_str);
-			fflush(stderr);
+			(void)fflush(stderr);
 			secs_last = secs_now;
 		}
 	}
