@@ -61,6 +61,7 @@
 #define OPT_OVERFLOW		(0x00000080)
 #define OPT_ZERO		(0x00000100)
 #define OPT_URANDOM		(0x00000200)
+#define OPT_APPEND		(0x00000400)
 
 static int opt_flags;
 static const char *app_name = "sluice";
@@ -195,6 +196,7 @@ static void show_usage(void)
 {
 	printf("%s, version %s\n\n", app_name, VERSION);
 	printf("Usage: %s [options]\n", app_name);
+	printf("  -a        append to file (-t option only).\n");
 	printf("  -c delay  specify constant delay time (seconds).\n");
 	printf("  -d        discard input (no output).\n");
 	printf("  -f freq   frequency of -v statistics.\n");
@@ -234,10 +236,13 @@ int main(int argc, char **argv)
 
 	for (;;) {
 		size_t len;
-		int c = getopt(argc, argv, "r:h?i:vm:wudot:f:zRs:c:");
+		int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:");
 		if (c == -1)
 			break;
 		switch (c) {
+		case 'a':
+			opt_flags |= OPT_APPEND;
+			break;
 		case 'c':
 			opt_flags |= (OPT_GOT_CONST_DELAY |
 				      OPT_UNDERFLOW |
@@ -295,6 +300,11 @@ int main(int argc, char **argv)
 			show_usage();
 			exit(EXIT_FAILURE);
 		}
+	}
+
+	if (!filename && (opt_flags & OPT_APPEND)) {
+		fprintf(stderr, "Must use -t filename when using the -a option.\n");
+		goto tidy;
 	}
 
 	if (!(opt_flags & OPT_GOT_RATE)) {
@@ -375,8 +385,9 @@ int main(int argc, char **argv)
 
 	if (filename) {
 		(void)umask(0077);
+		int open_flags = (opt_flags & OPT_APPEND) ? O_APPEND : O_TRUNC;
 
-		fdtee = open(filename, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
+		fdtee = open(filename, O_CREAT | open_flags | O_WRONLY, S_IRUSR | S_IWUSR);
 		if (fdtee < 0) {
 			fprintf(stderr, "open on %s failed: errno = %d (%s).\n",
 				filename, errno, strerror(errno));

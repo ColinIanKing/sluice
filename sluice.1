@@ -31,6 +31,10 @@ a specified data rate.
 .SH OPTIONS
 sluice options are as follow:
 .TP
+.B \-a
+append to file (used in conjunction with the \-t 'tee' option). Instead of creating a new file
+or truncating an existing file, this option appends data to the 'tee' file.
+.TP
 .B \-c delay
 define constant delay time (in seconds) between writes. This option enables a constant
 time between writes and adjusts the buffer size to try and keep the data rate
