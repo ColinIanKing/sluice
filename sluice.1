@@ -52,14 +52,14 @@ specify the frequency of -v verbose statistics updates. The default is 1/3 of a 
 show help
 .TP
 .B \-i size
-specify the read/write size, the default size is in bytes, but the K, M and G suffixes
-can specify size in Kbytes, Mbytes and Gbytes respectively. By specifying
+specify the read/write size, the default size is in bytes, but the K, M, G and T suffixes
+can specify size in Kilobytes, Megabytes, Gigabytes and Terabytes respectively. By specifying
 a fixed buffer size means that this option is mutually exclusive to the \-c
 option.
 .TP
 .B \-m size
-specify amount of data to process, the default size is in bytes, but the K, M and G suffixes
-can specify size in Kbytes, Mbytes and Gbytes respectively.
+specify amount of data to process, the default size is in bytes, but the K, M, G and T suffixes
+can specify size in Kilobytes, Megabytes, Gigabytes and Terabytes respectively.
 .TP
 .B \-o
 detect overflow and re-size read/write buffer size to try and stop overflows. This will
@@ -67,8 +67,8 @@ shrink the buffer each time 10 consecutive overflows are detected. The buffer wi
 be shrunk any less than 1 byte in size.
 .TP
 .B \-r rate
-specify the data rate in bytes per second. The K, M and G suffixes
-can specify the rate in Kbytes/sec, Mbytes/sec and Gbytes/sec respectively.
+specify the data rate in bytes per second. The K, M, G and T suffixes
+can specify the rate in Kilobytes/sec, Megabytes/sec, Gigabytes/sec and Terabytes/sec respectively.
 .TP
 .B \-R
 don't read from stdin, instead generate a stream of random data from /dev/urandom.

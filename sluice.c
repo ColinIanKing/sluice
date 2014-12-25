@@ -173,15 +173,16 @@ static uint64_t get_uint64_scale(
 
 /*
  *  get_uint64_byte()
- *	size in bytes, K bytes, M bytes or G bytes
+ *	size in bytes, K bytes, M bytes, G bytes or T bytes
  */
 static uint64_t get_uint64_byte(const char *const str)
 {
 	static const scale_t scales[] = {
-		{ 'b', 	1 },
-		{ 'k',  1 << 10 },
-		{ 'm',  1 << 20 },
-		{ 'g',  1 << 30 },
+		{ 'b', 	1ULL },
+		{ 'k',  1ULL << 10 },
+		{ 'm',  1ULL << 20 },
+		{ 'g',  1ULL << 30 },
+		{ 't',  1ULL << 40 },
 		{ 0,    0 },
 	};
 
@@ -306,7 +307,6 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Must use -t filename when using the -a option.\n");
 		goto tidy;
 	}
-
 	if (!(opt_flags & OPT_GOT_RATE)) {
 		fprintf(stderr, "Must specify data rate with -r option.\n");
 		goto tidy;
