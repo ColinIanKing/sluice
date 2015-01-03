@@ -251,6 +251,29 @@ static uint64_t get_uint64(const char *const str, size_t *len)
 }
 
 /*
+ *  get_double()
+ *	get a double value
+ */
+static double get_double(const char *const str, size_t *len)
+{
+	double val;
+	*len = strlen(str);
+
+	errno = 0;
+	val = strtod(str, NULL);
+	if (errno) {
+		fprintf(stderr, "Invalid value %s.\n", str);
+		exit(EXIT_FAILURE);
+	}
+	if (*len == 0) {
+		fprintf(stderr, "Value %s is an invalid size.\n", str);
+		exit(EXIT_FAILURE);
+	}
+	return val;
+}
+
+
+/*
  *  get_uint64_scale()
  *	get a value and scale it by the given scale factor
  */
@@ -259,22 +282,27 @@ static uint64_t get_uint64_scale(
 	const scale_t scales[],
 	const char *const msg)
 {
-	uint64_t val;
+	double val;
 	size_t len = strlen(str);
 	int i;
 	char ch;
 
-	val = get_uint64(str, &len);
+	val = get_double(str, &len);
 	len--;
 	ch = str[len];
 
-	if (isdigit(ch))
-		return val;
+	if (val < 0.0) {
+		printf("Value cannot be negative\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (isdigit(ch) || ch == '.')
+		return (uint64_t)val;
 
 	ch = tolower(ch);
 	for (i = 0; scales[i].ch; i++) {
 		if (ch == scales[i].ch)
-			return val * scales[i].scale;
+			return (uint64_t)(val * scales[i].scale);
 	}
 
 	printf("Illegal %s specifier %c\n", msg, str[len]);
