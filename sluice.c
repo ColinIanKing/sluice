@@ -292,7 +292,7 @@ static uint64_t get_uint64_scale(
 	ch = str[len];
 
 	if (val < 0.0) {
-		printf("Value cannot be negative\n");
+		printf("Value %s cannot be negative\n", str);
 		exit(EXIT_FAILURE);
 	}
 
