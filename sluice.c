@@ -28,6 +28,8 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <ctype.h>
+#include <signal.h>
+#include <setjmp.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -68,6 +70,7 @@
 static int opt_flags;
 static const char *app_name = "sluice";
 static const char *dev_urandom = "/dev/urandom";
+static sigjmp_buf jmpbuf;
 
 typedef struct {
 	const char ch;		/* Scaling suffix */
@@ -87,6 +90,17 @@ typedef struct {
 	double		target_rate;
 	double		buf_size_total;
 } stats_t;
+
+/*
+ *  handle_sigint()
+ *	catch SIGINT, jump to tidy termination
+ */
+static void handle_sigint(int dummy)
+{
+	(void)dummy;
+
+	siglongjmp(jmpbuf, 1);
+}
 
 /*
  *  stats_init()
@@ -376,6 +390,7 @@ int main(int argc, char **argv)
 	double const_delay = -1.0;
 	bool eof = false;
 	stats_t stats;
+	struct sigaction new_action;
 
 	stats_init(&stats);
 
@@ -570,6 +585,19 @@ int main(int argc, char **argv)
 	stats.time_begin = secs_start;
 	stats.target_rate = data_rate;
 
+	if (sigsetjmp(jmpbuf, 1) != 0)
+		goto finish;
+
+	new_action.sa_handler = handle_sigint;
+	sigemptyset(&new_action.sa_mask);
+	new_action.sa_flags = 0;
+	if (sigaction(SIGINT, &new_action, NULL) < 0) {
+		fprintf(stderr, "Sigaction failed: errno=%d (%s).\n",
+			errno, strerror(errno));
+		goto tidy;
+	}
+
+
 	while (!eof) {
 		uint64_t current_rate, inbufsize = 0;
 		bool complete = false;
@@ -738,6 +766,7 @@ int main(int argc, char **argv)
 	}
 	ret = EXIT_SUCCESS;
 
+finish:
 	if (opt_flags & OPT_VERBOSE)
 		fprintf(stderr, "%78s\r", "");
 
