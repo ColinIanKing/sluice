@@ -205,6 +205,7 @@ static void show_usage(void)
 	printf("  -i size   set io read/write size in bytes.\n");
 	printf("  -m size   set maximum amount to process.\n");
 	printf("  -o        shrink read/write buffer to avoid overflow.\n");
+	printf("  -O file   short cut for -dt file; output to a file.\n");
 	printf("  -r rate   set rate (in bytes per second).\n");
 	printf("  -R	    ignore stdin, read from %s.\n", dev_urandom);
 	printf("  -s shift  delay shift, controls delay adjustment.\n");
@@ -238,7 +239,7 @@ int main(int argc, char **argv)
 
 	for (;;) {
 		size_t len;
-		int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:");
+		int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:");
 		if (c == -1)
 			break;
 		switch (c) {
@@ -270,8 +271,9 @@ int main(int argc, char **argv)
 		case 'm':
 			max_trans = get_uint64_byte(optarg);
 			break;
-		case 'o':
-			opt_flags |= OPT_OVERFLOW;
+		case 'O':
+			opt_flags |= OPT_DISCARD_STDOUT;
+			filename = optarg;
 			break;
 		case 'r':
 			data_rate = get_uint64_byte(optarg);
