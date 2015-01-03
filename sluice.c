@@ -29,7 +29,6 @@
 #include <errno.h>
 #include <ctype.h>
 #include <signal.h>
-#include <setjmp.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -70,7 +69,7 @@
 static int opt_flags;
 static const char *app_name = "sluice";
 static const char *dev_urandom = "/dev/urandom";
-static sigjmp_buf jmpbuf;
+static volatile bool sluice_finish = false;
 
 typedef struct {
 	const char ch;		/* Scaling suffix */
@@ -99,7 +98,7 @@ static void handle_sigint(int dummy)
 {
 	(void)dummy;
 
-	siglongjmp(jmpbuf, 1);
+	sluice_finish = true;
 }
 
 /*
@@ -205,8 +204,10 @@ static inline double timeval_to_double(void)
 	struct timeval tv;
 
 	if (gettimeofday(&tv, NULL) < 0) {
-		fprintf(stderr, "gettimeofday error: errno=%d (%s).\n",
-			errno, strerror(errno));
+		if (errno != EINTR) {
+			fprintf(stderr, "gettimeofday error: errno=%d (%s).\n",
+				errno, strerror(errno));
+		}
 		return -1.0;
 	}
 	return (double)tv.tv_sec + ((double)tv.tv_usec / 1000000.0);
@@ -585,9 +586,6 @@ int main(int argc, char **argv)
 	stats.time_begin = secs_start;
 	stats.target_rate = data_rate;
 
-	if (sigsetjmp(jmpbuf, 1) != 0)
-		goto finish;
-
 	new_action.sa_handler = handle_sigint;
 	sigemptyset(&new_action.sa_mask);
 	new_action.sa_flags = 0;
@@ -596,7 +594,6 @@ int main(int argc, char **argv)
 			errno, strerror(errno));
 		goto tidy;
 	}
-
 
 	while (!eof) {
 		uint64_t current_rate, inbufsize = 0;
@@ -621,6 +618,8 @@ int main(int argc, char **argv)
 
 				n = read(fdin, ptr, (ssize_t)sz);
 				if (n < 0) {
+					if ((errno == EINTR) && sluice_finish)
+						goto finish;
 					fprintf(stderr,"Read error: errno=%d (%s).\n",
 						errno, strerror(errno));
 					goto tidy;
@@ -647,6 +646,8 @@ int main(int argc, char **argv)
 		}
 		if (fdtee >= 0) {
 			if (write(fdtee, buffer, (size_t)inbufsize) < 0) {
+				if ((errno == EINTR) && sluice_finish)
+					goto finish;
 				fprintf(stderr, "Write error: errno=%d (%s).\n",
 					errno, strerror(errno));
 				goto tidy;
@@ -657,14 +658,19 @@ int main(int argc, char **argv)
 
 		if (delay > 0) {
 			if (usleep(delay) < 0) {
+				if ((errno == EINTR) && sluice_finish)
+					goto finish;
 				fprintf(stderr, "usleep error: errno=%d (%s).\n",
 					errno, strerror(errno));
 				goto tidy;
 			}
 		}
 
-		if ((secs_now = timeval_to_double()) < 0.0)
+		if ((secs_now = timeval_to_double()) < 0.0) {
+			if ((errno == EINTR) && sluice_finish)
+				goto finish;
 			goto tidy;
+		}
 		current_rate = (uint64_t)(((double)total_bytes) / (secs_now - secs_start));
 
 		if (current_rate > (double)data_rate) {
