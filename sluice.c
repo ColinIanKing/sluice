@@ -57,7 +57,7 @@
 #define OPT_GOT_CONST_DELAY	(0x00000008)
 #define OPT_WARNING		(0x00000010)
 #define OPT_UNDERFLOW		(0x00000020)
-#define OPT_DISCARD		(0x00000040)
+#define OPT_DISCARD_STDOUT	(0x00000040)
 #define OPT_OVERFLOW		(0x00000080)
 #define OPT_ZERO		(0x00000100)
 #define OPT_URANDOM		(0x00000200)
@@ -234,6 +234,7 @@ int main(int argc, char **argv)
 	int ret = EXIT_FAILURE;
 	double secs_start, secs_last, freq = DEFAULT_FREQ;
 	double const_delay = -1.0;
+	bool eof = false;
 
 	for (;;) {
 		size_t len;
@@ -253,7 +254,7 @@ int main(int argc, char **argv)
 			overflow_adjust = 1;
 			break;
 		case 'd':
-			opt_flags |= OPT_DISCARD;
+			opt_flags |= OPT_DISCARD_STDOUT;
 			break;
 		case 'f':
 			freq = atof(optarg);
@@ -415,7 +416,7 @@ int main(int argc, char **argv)
 		delay = (int)(((double)io_size * 1000000) / (double)data_rate);
 	secs_last = secs_start;
 
-	for (;;) {
+	while (!eof) {
 		uint64_t current_rate, inbufsize = 0;
 		bool complete = false;
 		double secs_now;
@@ -424,6 +425,7 @@ int main(int argc, char **argv)
 			inbufsize = io_size;
 			total_bytes += io_size;
 		} else {
+			char *ptr = buffer;
 			while (!complete && (inbufsize < io_size)) {
 				uint64_t sz = io_size - inbufsize;
 				ssize_t n;
@@ -434,17 +436,22 @@ int main(int argc, char **argv)
 					complete = true;
 				}
 
-				n = read(fdin, buffer, (ssize_t)sz);
+				n = read(fdin, ptr, (ssize_t)sz);
 				if (n < 0) {
 					fprintf(stderr,"Read error: errno=%d (%s).\n",
 						errno, strerror(errno));
 					goto tidy;
 				}
+				if (n == 0) {
+					eof = true;
+					break;
+				}
 				inbufsize += n;
 				total_bytes += n;
+				ptr += n;
 			}
 		}
-		if (!(opt_flags & OPT_DISCARD)) {
+		if (!(opt_flags & OPT_DISCARD_STDOUT)) {
 			if (write(fdout, buffer, (size_t)inbufsize) < 0) {
 				fprintf(stderr,"Write error: errno=%d (%s).\n",
 					errno, strerror(errno));
@@ -453,12 +460,12 @@ int main(int argc, char **argv)
 		}
 		if (fdtee >= 0) {
 			if (write(fdtee, buffer, (size_t)inbufsize) < 0) {
-				fprintf(stderr,"Write error: errno=%d (%s).\n",
+				fprintf(stderr, "Write error: errno=%d (%s).\n",
 					errno, strerror(errno));
 				goto tidy;
 			}
 		}
-		if (max_trans && total_bytes >= max_trans)
+		if (eof || (max_trans && total_bytes >= max_trans))
 			break;
 
 		if (delay > 0) {
