@@ -738,6 +738,9 @@ int main(int argc, char **argv)
 	}
 	ret = EXIT_SUCCESS;
 
+	if (opt_flags & OPT_VERBOSE)
+		fprintf(stderr, "%78s\r", "");
+
 	if (opt_flags & OPT_STATS) {
 		if ((stats.time_end = timeval_to_double()) < 0.0)
 			goto tidy;
