@@ -260,7 +260,6 @@ int main(int argc, char **argv)
 		case 'f':
 			freq = atof(optarg);
 			break;
-		case '?':
 		case 'h':
 			show_usage();
 			exit(EXIT_SUCCESS);
@@ -300,6 +299,9 @@ int main(int argc, char **argv)
 		case 'z':
 			opt_flags |= OPT_ZERO;
 			break;
+		case '?':
+			printf("Try '%s -h' for more information.\n", app_name);
+			exit(EXIT_FAILURE);
 		default:
 			show_usage();
 			exit(EXIT_FAILURE);
