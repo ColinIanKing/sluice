@@ -31,14 +31,15 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/times.h>
 
 #define KB			(1024ULL)
 #define MB			(KB * KB)
 #define GB			(KB * KB * KB)
 
-#define UNDERFLOW_MAX		(100)
-#define UNDERFLOW_ADJUST_MAX	(10)
-#define OVERFLOW_ADJUST_MAX	(10)
+#define UNDERRUN_MAX		(100)
+#define UNDERRUN_ADJUST_MAX	(10)
+#define OVERRUN_ADJUST_MAX	(10)
 
 #define DELAY_SHIFT_MIN		(1)
 #define DELAY_SHIFT_MAX		(16)
@@ -56,12 +57,13 @@
 #define OPT_GOT_IOSIZE		(0x00000004)
 #define OPT_GOT_CONST_DELAY	(0x00000008)
 #define OPT_WARNING		(0x00000010)
-#define OPT_UNDERFLOW		(0x00000020)
+#define OPT_UNDERRUN		(0x00000020)
 #define OPT_DISCARD_STDOUT	(0x00000040)
-#define OPT_OVERFLOW		(0x00000080)
+#define OPT_OVERRUN		(0x00000080)
 #define OPT_ZERO		(0x00000100)
 #define OPT_URANDOM		(0x00000200)
 #define OPT_APPEND		(0x00000400)
+#define OPT_STATS		(0x00000800)
 
 static int opt_flags;
 static const char *app_name = "sluice";
@@ -71,6 +73,114 @@ typedef struct {
 	const char ch;		/* Scaling suffix */
 	const uint64_t  scale;	/* Amount to scale by */
 } scale_t;
+
+/* various statistics */
+typedef struct {
+	uint64_t	reads;
+	uint64_t	writes;
+	uint64_t	total_bytes;
+	uint64_t	underruns;
+	uint64_t	overruns;
+	uint64_t	perfect;
+	double		time_begin;
+	double		time_end;
+	double		target_rate;
+	double		buf_size_total;
+} stats_t;
+
+/*
+ *  stats_init()
+ *	Initialize statistics
+ */
+static inline void stats_init(stats_t *stats)
+{
+	stats->reads = 0;
+	stats->writes = 0;
+	stats->total_bytes = 0;
+	stats->underruns = 0;
+	stats->overruns = 0;
+	stats->perfect = 0;
+	stats->time_begin = 0.0;
+	stats->time_end = 0.0;
+	stats->target_rate = 0.0;
+	stats->buf_size_total = 0.0;
+}
+
+/*
+ *  double_to_str()
+ *	convert double size in bytes to string
+ */
+static char *double_to_str(double val)
+{
+	int i;
+	static char buf[64];
+	static char *sizes[] = {
+		"",
+		"K",
+		"M",
+		"G",
+		"T",
+		"P",
+	};
+
+	for (i = 0; i < 5; i++) {
+		if (val > 512.0)
+			val /= 1024.0;
+		else
+			break;
+	}
+	snprintf(buf, sizeof(buf), "%.2f%s", val, sizes[i]);
+
+	return buf;
+}
+
+/*
+ *  stats_info()
+ *	display run time statistics
+ */
+static void stats_info(stats_t *stats)
+{
+	double total = stats->underruns + stats->overruns + stats->perfect;
+	double secs = stats->time_end - stats->time_begin;
+	double avg_wr_sz;
+	struct tms t;
+
+	if (secs <= 0.0)  {
+		fprintf(stderr, "Cannot compute statistics\n");
+		return;
+	}
+	avg_wr_sz = stats->writes ?
+		stats->buf_size_total / stats->writes : 0.0;
+	fprintf(stderr, "Data:            %s\n",
+		double_to_str((double)stats->total_bytes));
+	fprintf(stderr, "Reads:           %" PRIu64 "\n",
+		stats->reads);
+	fprintf(stderr, "Writes:          %" PRIu64 "\n",
+		stats->writes);
+	fprintf(stderr, "Avg. Write Size: %sB\n",
+		double_to_str(avg_wr_sz));
+	fprintf(stderr, "Duration:        %.3f secs\n",
+		secs);
+	fprintf(stderr, "Target rate:     %s/sec\n",
+		double_to_str(stats->target_rate));
+	fprintf(stderr, "Actual rate:     %s/sec\n",
+		double_to_str((double)stats->total_bytes / secs));
+	fprintf(stderr, "Overruns:        %3.2f%%\n", total ?
+		100.0 * (double)stats->underruns / total : 0.0);
+	fprintf(stderr, "Underruns:       %3.2f%%\n", total ?
+		100.0 * (double)stats->overruns / total : 0.0);
+
+	if (times(&t) != (clock_t)-1) {
+		long int ticks_per_sec;
+
+		if ((ticks_per_sec = sysconf(_SC_CLK_TCK)) >= 0) {
+			fprintf(stderr, "User time:       %.3f secs\n",
+				(double)t.tms_utime / (double)ticks_per_sec);
+			fprintf(stderr, "System time:     %.3f secs\n",
+				(double)t.tms_stime / (double)ticks_per_sec);
+		}
+	}
+}
 
 /*
  *  timeval_to_double()
@@ -120,7 +230,7 @@ static void size_to_str(
 
 /*
  *  get_uint64()
- *	get a uint64 valu
+ *	get a uint64 value
  */
 static uint64_t get_uint64(const char *const str, size_t *len)
 {
@@ -204,15 +314,16 @@ static void show_usage(void)
 	printf("  -h        print this help.\n");
 	printf("  -i size   set io read/write size in bytes.\n");
 	printf("  -m size   set maximum amount to process.\n");
-	printf("  -o        shrink read/write buffer to avoid overflow.\n");
+	printf("  -o        shrink read/write buffer to avoid overrun.\n");
 	printf("  -O file   short cut for -dt file; output to a file.\n");
 	printf("  -r rate   set rate (in bytes per second).\n");
 	printf("  -R	    ignore stdin, read from %s.\n", dev_urandom);
 	printf("  -s shift  delay shift, controls delay adjustment.\n");
+	printf("  -S        display statistics at end of stream to sterr.\n");
 	printf("  -t file   tee output to file.\n");
-	printf("  -u        expand read/write buffer to avoid underflow.\n");
+	printf("  -u        expand read/write buffer to avoid underrun.\n");
 	printf("  -v        set verbose mode (to stderr).\n");
-	printf("  -w        warn on data rate underflow.\n");
+	printf("  -w        warn on data rate underrun.\n");
 	printf("  -z        ignore stdin, generate zeros.\n");
 }
 
@@ -227,19 +338,22 @@ int main(int argc, char **argv)
 	uint64_t total_bytes = 0;
 	uint64_t max_trans = 0;
 	uint64_t delay_shift = 3;
-	int underflow_adjust = UNDERFLOW_ADJUST_MAX;
-	int overflow_adjust = OVERFLOW_ADJUST_MAX;
+	int underrun_adjust = UNDERRUN_ADJUST_MAX;
+	int overrun_adjust = OVERRUN_ADJUST_MAX;
 	int fdin = -1, fdout, fdtee = -1;
 	int warnings = 0;
-	int underflows = 0, overflows = 0;
+	int underruns = 0, overruns = 0;
 	int ret = EXIT_FAILURE;
 	double secs_start, secs_last, freq = DEFAULT_FREQ;
 	double const_delay = -1.0;
 	bool eof = false;
+	stats_t stats;
+
+	stats_init(&stats);
 
 	for (;;) {
 		size_t len;
-		int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:");
+		int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:S");
 		if (c == -1)
 			break;
 		switch (c) {
@@ -248,11 +362,11 @@ int main(int argc, char **argv)
 			break;
 		case 'c':
 			opt_flags |= (OPT_GOT_CONST_DELAY |
-				      OPT_UNDERFLOW |
-				      OPT_OVERFLOW);
+				      OPT_UNDERRUN |
+				      OPT_OVERRUN);
 			const_delay = atof(optarg);
-			underflow_adjust = 1;
-			overflow_adjust = 1;
+			underrun_adjust = 1;
+			overrun_adjust = 1;
 			break;
 		case 'd':
 			opt_flags |= OPT_DISCARD_STDOUT;
@@ -270,6 +384,9 @@ int main(int argc, char **argv)
 		case 'm':
 			max_trans = get_uint64_byte(optarg);
 			break;
+		case 'o':
+			opt_flags |= OPT_OVERRUN;
+			break;
 		case 'O':
 			opt_flags |= OPT_DISCARD_STDOUT;
 			filename = optarg;
@@ -284,11 +401,14 @@ int main(int argc, char **argv)
 		case 's':
 			delay_shift = get_uint64(optarg, &len);
 			break;
+		case 'S':
+			opt_flags |= OPT_STATS;
+			break;
 		case 't':
 			filename = optarg;
 			break;
 		case 'u':
-			opt_flags |= OPT_UNDERFLOW;
+			opt_flags |= OPT_UNDERRUN;
 			break;
 		case 'v':
 			opt_flags |= OPT_VERBOSE;
@@ -411,7 +531,7 @@ int main(int argc, char **argv)
 	}
 	fdout = fileno(stdout);
 
-	if ((secs_start = timeval_to_double()) < 0)
+	if ((secs_start = timeval_to_double()) < 0.0)
 		goto tidy;
 
 	if (opt_flags & OPT_GOT_CONST_DELAY)
@@ -419,6 +539,8 @@ int main(int argc, char **argv)
 	else
 		delay = (int)(((double)io_size * 1000000) / (double)data_rate);
 	secs_last = secs_start;
+	stats.time_begin = secs_start;
+	stats.target_rate = data_rate;
 
 	while (!eof) {
 		uint64_t current_rate, inbufsize = 0;
@@ -428,6 +550,7 @@ int main(int argc, char **argv)
 		if (opt_flags & OPT_ZERO) {
 			inbufsize = io_size;
 			total_bytes += io_size;
+			stats.reads++;
 		} else {
 			char *ptr = buffer;
 			while (!complete && (inbufsize < io_size)) {
@@ -453,8 +576,12 @@ int main(int argc, char **argv)
 				inbufsize += n;
 				total_bytes += n;
 				ptr += n;
+				stats.reads++;
 			}
 		}
+		stats.writes++;
+		stats.total_bytes += inbufsize;
+		stats.buf_size_total += inbufsize;
 		if (!(opt_flags & OPT_DISCARD_STDOUT)) {
 			if (write(fdout, buffer, (size_t)inbufsize) < 0) {
 				fprintf(stderr,"Write error: errno=%d (%s).\n",
@@ -480,7 +607,7 @@ int main(int argc, char **argv)
 			}
 		}
 
-		if ((secs_now = timeval_to_double()) < 0)
+		if ((secs_now = timeval_to_double()) < 0.0)
 			goto tidy;
 		current_rate = (uint64_t)(((double)total_bytes) / (secs_now - secs_start));
 
@@ -489,27 +616,30 @@ int main(int argc, char **argv)
 			if (!(opt_flags & OPT_GOT_CONST_DELAY))
 				delay += ((last_delay >> delay_shift) + 100);
 			warnings = 0;
-			underflows = 0;
-			overflows++;
+			underruns = 0;
+			overruns++;
+			stats.overruns++;
 		} else if (current_rate < (double)data_rate) {
 			run = '-' ;
 			if (!(opt_flags & OPT_GOT_CONST_DELAY))
 				delay -= ((last_delay >> delay_shift) + 100);
 			warnings++;
-			underflows++;
-			overflows = 0;
+			underruns++;
+			stats.underruns++;
+			overruns = 0;
 		} else {
 			/* Unlikely.. */
 			warnings = 0;
-			underflows = 0;
-			overflows = 0;
+			underruns = 0;
+			overruns = 0;
+			stats.perfect++;
 			run = '0';
 		}
 		if (delay < 0)
 			delay = 0;
 
-		if ((opt_flags & OPT_UNDERFLOW) &&
-		    (underflows > underflow_adjust)) {
+		if ((opt_flags & OPT_UNDERRUN) &&
+		    (underruns > underrun_adjust)) {
 			char *tmp;
 			uint64_t tmp_io_size = io_size + (io_size >> 2);
 
@@ -526,11 +656,11 @@ int main(int argc, char **argv)
 					io_size = tmp_io_size;
 				}
 			}
-			underflows = 0;
+			underruns = 0;
 		}
 
-		if ((opt_flags & OPT_OVERFLOW) &&
-		    (overflows > overflow_adjust)) {
+		if ((opt_flags & OPT_OVERRUN) &&
+		    (overruns > overrun_adjust)) {
 			char *tmp;
 			uint64_t tmp_io_size = io_size - (io_size >> 2);
 
@@ -543,13 +673,13 @@ int main(int argc, char **argv)
 					io_size = tmp_io_size;
 				}
 			}
-			overflows = 0;
+			overruns = 0;
 		}
 
-		/* Too many continuous underflows? */
+		/* Too many continuous underruns? */
 		if ((opt_flags & OPT_WARNING) &&
-		    (warnings > UNDERFLOW_MAX)) {
-			fprintf(stderr, "Warning: data underflow, "
+		    (warnings > UNDERRUN_MAX)) {
+			fprintf(stderr, "Warning: data underrun, "
 				"use larger I/O size (-i option)\n");
 			opt_flags &= ~OPT_WARNING;
 		}
@@ -579,7 +709,14 @@ int main(int argc, char **argv)
 		}
 	}
 	ret = EXIT_SUCCESS;
+
+	if (opt_flags & OPT_STATS) {
+		if ((stats.time_end = timeval_to_double()) < 0.0)
+			goto tidy;
+		stats_info(&stats);
+	}
 tidy:
+
 	if ((fdin != -1) && (opt_flags & OPT_URANDOM)) {
 		(void)close(fdin);
 	}

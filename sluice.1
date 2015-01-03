@@ -39,7 +39,7 @@ or truncating an existing file, this option appends data to the 'tee' file.
 define constant delay time (in seconds) between writes. This option enables a constant
 time between writes and adjusts the buffer size to try and keep the data rate
 constant.  This option is mutually exclusive to the \-i option.  This implicitly
-enables the \-o (overflow) and \-u (underflow) buffer management options to
+enables the \-o (overrun) and \-u (underrun) buffer management options to
 keep the data rate constant.
 .TP
 .B \-d
@@ -62,8 +62,8 @@ specify amount of data to process, the default size is in bytes, but the K, M, G
 can specify size in Kilobytes, Megabytes, Gigabytes and Terabytes respectively.
 .TP
 .B \-o
-detect overflow and re-size read/write buffer size to try and stop overflows. This will
-shrink the buffer each time 10 consecutive overflows are detected. The buffer will not
+detect overrun and re-size read/write buffer size to try and stop overrun. This will
+shrink the buffer each time 10 consecutive overruns are detected. The buffer will not
 be shrunk any less than 1 byte in size.
 .TP
 .B \-O file
@@ -84,19 +84,22 @@ specified rate.  The smaller the shift value the quicker it takes, however, this
 result in a highly fluctuating rate because the delay varies by a large amount causing
 over overshoot and undershoot.  The default value is 3 and works well for most rates.
 .TP
+.B \-S
+print various performance and buffering statistics to stderr when end of file is reached.
+.TP
 .B \-t file
 tee output to the specified file. Output is written to both stdout and to the named file.
 .TP
 .B \-u
-detect underflow and re-size read/write buffer size to try and stop underflows. This will
-expand the buffer each time 10 consecutive underflows are detected. The buffer will not
+detect underrun and re-size read/write buffer size to try and stop underrun. This will
+expand the buffer each time 10 consecutive underruns are detected. The buffer will not
 be expanded any more than 4MB in size.
 .TP
 .B \-v
 write verbose statistics to stderr
 .TP
 .B \-w
-warn if a long burst of continuous data rate underflow occurs, the warning is issued just once.  To overcome the underflow increase the \-i read/write buffer size or use the \-u option to auto-expand the read/write buffer.
+warn if a long burst of continuous data rate underrun occurs, the warning is issued just once.  To overcome the underrun increase the \-i read/write buffer size or use the \-u option to auto-expand the read/write buffer.
 .TP
 .B \-z
 don't read from stdin, instead generate a stream of zeros.
@@ -112,7 +115,7 @@ Read 32MB from /dev/zero and write at the rate of 64K/sec to stdout with feedbac
 cat /dev/zero | sluice \-r 64K \-v \-m 32M
 .RE
 .LP
-Generate a stream of zeros and write at a rate of 1MB/sec to a fifo with underflow and overflow buffer management
+Generate a stream of zeros and write at a rate of 1MB/sec to a fifo with underrun and overrun buffer management
 .RS 8
 sluice \-z \-u \-o \-r 1MB \-O myfifo
 .RE
