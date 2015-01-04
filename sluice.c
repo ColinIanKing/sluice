@@ -51,7 +51,7 @@
 #define DELAY_MIN		(0.01)
 #define DELAY_MAX		(10.00)
 
-#define DEFAULT_FREQ		(0.33333333)
+#define DEFAULT_FREQ		(0.250)
 
 #define OPT_VERBOSE		(0x00000001)
 #define OPT_GOT_RATE		(0x00000002)
