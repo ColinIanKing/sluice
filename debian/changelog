@@ -1,3 +1,21 @@
+sluice (0.01.08-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Update manual date
+  * Rename adjust_shift variable
+  * Tweak settings for more optimal data rate tracking
+  * Minor code clean ups
+  * Make default freq 4Hz
+  * Fix up comments for get_uint64_byte
+  * Add the -n no rate control mode
+  * Improve help for -a option
+  * timeval_to_double should not be inlined
+  * Add 'P' petabyte specifier to man page
+  * Re-organise size to string formatting helper functions
+  * Remove longjmp, it causes -Wclobber issues
+
+ -- Colin King <colin.king@canonical.com>  Sat, 4 Jan 2015 14:32:00 +0000
+
 sluice (0.01.07-1) unstable; urgency=medium
 
   * Makefile: bump version
