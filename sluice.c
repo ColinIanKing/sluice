@@ -107,7 +107,7 @@ static void handle_sigint(int dummy)
  *  stats_init()
  *	Initialize statistics
  */
-static inline void stats_init(stats_t *stats)
+static inline void stats_init(stats_t *const stats)
 {
 	stats->reads = 0;
 	stats->writes = 0;
@@ -127,8 +127,8 @@ static inline void stats_init(stats_t *stats)
  */
 static void size_to_str(
 	const double val,
-	const char *fmt,
-	char *buf,
+	const char *const fmt,
+	char *const buf,
 	const size_t buflen)
 {
 	double v = val;
@@ -151,7 +151,6 @@ static void size_to_str(
 			break;
 	}
 
-	memset(buf, 0, buflen);
 	snprintf(buf, buflen, fmt, v, sizes[i]);
 }
 
@@ -159,12 +158,11 @@ static void size_to_str(
  *  double_to_str()
  *	convert double size in bytes to string
  */
-static char *double_to_str(double val)
+static char *double_to_str(const double val)
 {
 	static char buf[64];
 
 	size_to_str(val, "%.2f %s", buf, sizeof(buf));
-
 	return buf;
 }
 
@@ -173,7 +171,7 @@ static char *double_to_str(double val)
  *  stats_info()
  *	display run time statistics
  */
-static void stats_info(stats_t *stats)
+static void stats_info(const stats_t *stats)
 {
 	double total = stats->underruns + stats->overruns + stats->perfect;
 	double secs = stats->time_end - stats->time_begin;
@@ -208,7 +206,7 @@ static void stats_info(stats_t *stats)
 	if (times(&t) != (clock_t)-1) {
 		long int ticks_per_sec;
 
-		if ((ticks_per_sec = sysconf(_SC_CLK_TCK)) >= 0) {
+		if ((ticks_per_sec = sysconf(_SC_CLK_TCK)) > 0) {
 			fprintf(stderr, "User time:       %.3f secs\n",
 				(double)t.tms_utime / (double)ticks_per_sec);
 			fprintf(stderr, "System time:     %.3f secs\n",
@@ -239,7 +237,7 @@ static double timeval_to_double(void)
  *  get_uint64()
  *	get a uint64 value
  */
-static uint64_t get_uint64(const char *const str, size_t *len)
+static uint64_t get_uint64(const char *const str, size_t *const len)
 {
 	uint64_t val;
 	*len = strlen(str);
@@ -261,7 +259,7 @@ static uint64_t get_uint64(const char *const str, size_t *len)
  *  get_double()
  *	get a double value
  */
-static double get_double(const char *const str, size_t *len)
+static double get_double(const char *const str, size_t *const len)
 {
 	double val;
 	*len = strlen(str);
@@ -389,8 +387,9 @@ int main(int argc, char **argv)
 	stats_init(&stats);
 
 	for (;;) {
+		const int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:Sn");
 		size_t len;
-		int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:Sn");
+
 		if (c == -1)
 			break;
 		switch (c) {
@@ -559,9 +558,9 @@ int main(int argc, char **argv)
 	}
 
 	if (filename) {
-		(void)umask(0077);
 		int open_flags = (opt_flags & OPT_APPEND) ? O_APPEND : O_TRUNC;
 
+		(void)umask(0077);
 		fdtee = open(filename, O_CREAT | open_flags | O_WRONLY, S_IRUSR | S_IWUSR);
 		if (fdtee < 0) {
 			fprintf(stderr, "open on %s failed: errno = %d (%s).\n",
