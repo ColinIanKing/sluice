@@ -81,12 +81,14 @@ can specify the rate in Kilobytes/sec, Megabytes/sec, Gigabytes/sec and Terabyte
 don't read from stdin, instead generate a stream of random data from /dev/urandom.
 .TP
 .B \-s shift
-modify the delay shift. The delay between each write is controlled by modifying the
-previous delay by adding or subtracting the previous delay right shifted by the shift
-value.  The larger the shift value the longer it takes to adjust up/down to the
-specified rate.  The smaller the shift value the quicker it takes, however, this can
+modify the rate adjustment shift. For the \-r option, the delay between each write is
+controlled by modifying the previous delay by adding or subtracting the previous delay
+right shifted by the shift value.  The larger the shift value the longer it takes to adjust up/down to the
+specified rate.  The smaller the shift value the quicker it takes to reach the optimal delay, however, this can
 result in a highly fluctuating rate because the delay varies by a large amount causing
-over overshoot and undershoot.  The default value is 3 and works well for most rates.
+over overshoot and undershoot.  The default value is 2 and works well for most rates.
+.br
+For the \-c, \-o and \-u options, the size of the buffer is modified by adding or subtracting the previous size shifted by the shift value.
 .TP
 .B \-S
 print various performance and buffering statistics to stderr when end of file is reached.
