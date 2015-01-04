@@ -342,7 +342,7 @@ static void show_usage(void)
 {
 	printf("%s, version %s\n\n", app_name, VERSION);
 	printf("Usage: %s [options]\n", app_name);
-	printf("  -a        append to file (-t option only).\n");
+	printf("  -a        append to file (-t, -O options only).\n");
 	printf("  -c delay  specify constant delay time (seconds).\n");
 	printf("  -d        discard input (no output).\n");
 	printf("  -f freq   frequency of -v statistics.\n");
