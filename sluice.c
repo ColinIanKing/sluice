@@ -71,23 +71,24 @@ static const char *app_name = "sluice";
 static const char *dev_urandom = "/dev/urandom";
 static volatile bool sluice_finish = false;
 
+/* scaling factor */
 typedef struct {
-	const char ch;		/* Scaling suffix */
-	const uint64_t  scale;	/* Amount to scale by */
+	const char ch;			/* Scaling suffix */
+	const uint64_t scale;		/* Amount to scale by */
 } scale_t;
 
 /* various statistics */
 typedef struct {
-	uint64_t	reads;
-	uint64_t	writes;
-	uint64_t	total_bytes;
-	uint64_t	underruns;
-	uint64_t	overruns;
-	uint64_t	perfect;
-	double		time_begin;
-	double		time_end;
-	double		target_rate;
-	double		buf_size_total;
+	uint64_t	reads;		/* Total read calls */
+	uint64_t	writes;		/* Total write calls */
+	uint64_t	total_bytes;	/* Total bytes copied */
+	uint64_t	underruns;	/* Count of underruns */
+	uint64_t	overruns;	/* Count of overruns */
+	uint64_t	perfect;	/* Count of no under/overruns */
+	double		time_begin;	/* Time began */
+	double		time_end;	/* Time ended */
+	double		target_rate;	/* Target transfer rate */
+	double		buf_size_total;	/* For average buffer size */
 } stats_t;
 
 /*
@@ -120,32 +121,52 @@ static inline void stats_init(stats_t *stats)
 }
 
 /*
+ *  size_to_str()
+ *	report size in different units
+ */
+static void size_to_str(
+	const double val,
+	const char *fmt,
+	char *buf,
+	const size_t buflen)
+{
+	double v = val;
+	int i;
+
+	static char *sizes[] = {
+		"B",	/* Bytes */
+		"KB",	/* Kilobytes */
+		"MB",	/* Megabytes */
+		"GB",	/* Gigabytes */
+		"TB",	/* Terabytes */
+		"PB",	/* Petabytes */
+		"EB",	/* Exabytes */
+		"ZB",	/* Zettabytes */
+		"YB",	/* Yottabytes */
+	};
+
+	for (i = 0; i < 8; i++, v /= 1024.0) {
+		if (v <= 512.0)
+			break;
+	}
+
+	memset(buf, 0, buflen);
+	snprintf(buf, buflen, fmt, v, sizes[i]);
+}
+
+/*
  *  double_to_str()
  *	convert double size in bytes to string
  */
 static char *double_to_str(double val)
 {
-	int i;
 	static char buf[64];
-	static char *sizes[] = {
-		"",
-		"K",
-		"M",
-		"G",
-		"T",
-		"P",
-	};
 
-	for (i = 0; i < 5; i++) {
-		if (val > 512.0)
-			val /= 1024.0;
-		else
-			break;
-	}
-	snprintf(buf, sizeof(buf), "%.2f%s", val, sizes[i]);
+	size_to_str(val, "%.2f %s", buf, sizeof(buf));
 
 	return buf;
 }
+
 
 /*
  *  stats_info()
@@ -170,7 +191,7 @@ static void stats_info(stats_t *stats)
 		stats->reads);
 	fprintf(stderr, "Writes:          %" PRIu64 "\n",
 		stats->writes);
-	fprintf(stderr, "Avg. Write Size: %sB\n",
+	fprintf(stderr, "Avg. Write Size: %s\n",
 		double_to_str(avg_wr_sz));
 	fprintf(stderr, "Duration:        %.3f secs\n",
 		secs);
@@ -211,36 +232,6 @@ static inline double timeval_to_double(void)
 		return -1.0;
 	}
 	return (double)tv.tv_sec + ((double)tv.tv_usec / 1000000.0);
-}
-
-/*
- *  size_to_str()
- *	report size in different units
- */
-static void size_to_str(
-	const uint64_t val,
-	char *buf,
-	const size_t buflen)
-{
-	double s;
-	char *units;
-
-	memset(buf, 0, buflen);
-
-	if (val < 10 * KB) {
-		s = (double)val;
-		units = "B";
-	} else if (val < 10 * MB) {
-		s = (double)val / KB;
-		units = "KB";
-	} else if (val < 10 * GB) {
-		s = (double)val / MB;
-		units = "MB";
-	} else {
-		s = (double)val / GB;
-		units = "GB";
-	}
-	snprintf(buf, buflen, "%7.1f %s", s, units);
 }
 
 /*
@@ -336,6 +327,7 @@ static uint64_t get_uint64_byte(const char *const str)
 		{ 'm',  1ULL << 20 },
 		{ 'g',  1ULL << 30 },
 		{ 't',  1ULL << 40 },
+		{ 'p',	1ULL << 60 },
 		{ 0,    0 },
 	};
 
@@ -384,8 +376,7 @@ int main(int argc, char **argv)
 	int underrun_adjust = UNDERRUN_ADJUST_MAX;
 	int overrun_adjust = OVERRUN_ADJUST_MAX;
 	int fdin = -1, fdout, fdtee = -1;
-	int warnings = 0;
-	int underruns = 0, overruns = 0;
+	int underruns = 0, overruns = 0, warnings = 0;
 	int ret = EXIT_FAILURE;
 	double secs_start, secs_last, freq = DEFAULT_FREQ;
 	double const_delay = -1.0;
@@ -755,11 +746,14 @@ int main(int argc, char **argv)
 			char total_bytes_str[32];
 			char io_size_str[32];
 
-			size_to_str(current_rate, current_rate_str,
+			size_to_str(current_rate, "%7.1f %s",
+				current_rate_str,
 				sizeof(current_rate_str));
-			size_to_str(total_bytes, total_bytes_str,
+			size_to_str(total_bytes, "%7.1f %s",
+				total_bytes_str,
 				sizeof(total_bytes_str));
-			size_to_str(io_size, io_size_str,
+			size_to_str(io_size, "%7.1f %s",
+				io_size_str,
 				sizeof(io_size_str));
 
 			fprintf(stderr,"Rate: %s/S, Adj: %c, "
