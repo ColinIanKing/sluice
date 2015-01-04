@@ -355,8 +355,8 @@ static void show_usage(void)
 	printf("  -O file   short cut for -dt file; output to a file.\n");
 	printf("  -r rate   set rate (in bytes per second).\n");
 	printf("  -R	    ignore stdin, read from %s.\n", dev_urandom);
-	printf("  -s shift  delay shift, controls delay adjustment.\n");
-	printf("  -S        display statistics at end of stream to sterr.\n");
+	printf("  -s shift  controls delay or buffer size adjustment.\n");
+	printf("  -S        display statistics at end of stream to stderr.\n");
 	printf("  -t file   tee output to file.\n");
 	printf("  -u        expand read/write buffer to avoid underrun.\n");
 	printf("  -v        set verbose mode (to stderr).\n");
@@ -374,7 +374,7 @@ int main(int argc, char **argv)
 	uint64_t data_rate = 0;
 	uint64_t total_bytes = 0;
 	uint64_t max_trans = 0;
-	uint64_t delay_shift = 3;
+	uint64_t adjust_shift = 3;
 	int underrun_adjust = UNDERRUN_ADJUST_MAX;
 	int overrun_adjust = OVERRUN_ADJUST_MAX;
 	int fdin = -1, fdout, fdtee = -1;
@@ -440,7 +440,7 @@ int main(int argc, char **argv)
 			opt_flags |= OPT_URANDOM;
 			break;
 		case 's':
-			delay_shift = get_uint64(optarg, &len);
+			adjust_shift = get_uint64(optarg, &len);
 			break;
 		case 'S':
 			opt_flags |= OPT_STATS;
@@ -496,7 +496,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Frequency too low.\n");
 		goto tidy;
 	}
-	if (delay_shift < DELAY_SHIFT_MIN || delay_shift > DELAY_SHIFT_MAX) {
+	if (adjust_shift < DELAY_SHIFT_MIN || adjust_shift > DELAY_SHIFT_MAX) {
 		fprintf(stderr, "Delay shift must be %d .. %d.\n",
 			DELAY_SHIFT_MIN, DELAY_SHIFT_MAX);
 		goto tidy;
@@ -693,7 +693,7 @@ int main(int argc, char **argv)
 			if (current_rate > (double)data_rate) {
 				run = '+' ;
 				if (!(opt_flags & OPT_GOT_CONST_DELAY))
-					delay += ((last_delay >> delay_shift) + 100);
+					delay += ((last_delay >> adjust_shift) + 100);
 				warnings = 0;
 				underruns = 0;
 				overruns++;
@@ -701,7 +701,7 @@ int main(int argc, char **argv)
 			} else if (current_rate < (double)data_rate) {
 				run = '-' ;
 				if (!(opt_flags & OPT_GOT_CONST_DELAY))
-					delay -= ((last_delay >> delay_shift) + 100);
+					delay -= ((last_delay >> adjust_shift) + 100);
 				warnings++;
 				underruns++;
 				stats.underruns++;
@@ -720,7 +720,7 @@ int main(int argc, char **argv)
 			if ((opt_flags & OPT_UNDERRUN) &&
 			    (underruns > underrun_adjust)) {
 				char *tmp;
-				uint64_t tmp_io_size = io_size + (io_size >> 2);
+				uint64_t tmp_io_size = io_size + (io_size >> adjust_shift);
 
 				/* If size is too small, we get stuck at 1 */
 				if (tmp_io_size < 4)
@@ -741,7 +741,7 @@ int main(int argc, char **argv)
 			if ((opt_flags & OPT_OVERRUN) &&
 			    (overruns > overrun_adjust)) {
 				char *tmp;
-				uint64_t tmp_io_size = io_size - (io_size >> 2);
+				uint64_t tmp_io_size = io_size - (io_size >> adjust_shift);
 
 				if (tmp_io_size > IO_SIZE_MIN) {
 					tmp = realloc(buffer, tmp_io_size);
