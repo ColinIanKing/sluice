@@ -39,8 +39,8 @@
 #define GB			(KB * KB * KB)
 
 #define UNDERRUN_MAX		(100)
-#define UNDERRUN_ADJUST_MAX	(10)
-#define OVERRUN_ADJUST_MAX	(10)
+#define UNDERRUN_ADJUST_MAX	(2)
+#define OVERRUN_ADJUST_MAX	(2)
 
 #define DELAY_SHIFT_MIN		(1)
 #define DELAY_SHIFT_MAX		(16)
@@ -52,6 +52,8 @@
 #define DELAY_MAX		(10.00)
 
 #define DEFAULT_FREQ		(0.250)
+
+#define DEBUG_RATE		(0)
 
 #define OPT_VERBOSE		(0x00000001)
 #define OPT_GOT_RATE		(0x00000002)
@@ -680,6 +682,10 @@ int main(int argc, char **argv)
 			goto tidy;
 		}
 		current_rate = (uint64_t)(((double)total_bytes) / (secs_now - secs_start));
+
+#if DEBUG_RATE
+		fprintf(stderr, "%" PRIu64 "\n", current_rate);
+#endif
 
 		if (opt_flags & OPT_NO_RATE_CONTROL) {
 			run = '-';
