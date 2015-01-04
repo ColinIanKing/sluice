@@ -318,17 +318,17 @@ static uint64_t get_uint64_scale(
 
 /*
  *  get_uint64_byte()
- *	size in bytes, K bytes, M bytes, G bytes or T bytes
+ *	size in bytes, K bytes, M bytes, G bytes, T bytes or P bytes
  */
 static uint64_t get_uint64_byte(const char *const str)
 {
 	static const scale_t scales[] = {
 		{ 'b', 	1ULL },
-		{ 'k',  1ULL << 10 },
-		{ 'm',  1ULL << 20 },
-		{ 'g',  1ULL << 30 },
-		{ 't',  1ULL << 40 },
-		{ 'p',	1ULL << 60 },
+		{ 'k',  1ULL << 10 },	/* Kilobytes */
+		{ 'm',  1ULL << 20 },	/* Megabytes */
+		{ 'g',  1ULL << 30 },	/* Gigabytes */
+		{ 't',  1ULL << 40 },	/* Terabytes */
+		{ 'p',	1ULL << 60 },	/* Petabytes */
 		{ 0,    0 },
 	};
 
