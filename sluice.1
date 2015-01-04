@@ -61,6 +61,10 @@ option.
 specify amount of data to process, the default size is in bytes, but the K, M, G and T suffixes
 can specify size in Kilobytes, Megabytes, Gigabytes and Terabytes respectively.
 .TP
+.B \-n
+no rate control. This is just a straight data copy much like cat. Combined with the \-v and \-S
+options one can observe the data rates of the copy.
+.TP
 .B \-o
 detect overrun and re-size read/write buffer size to try and stop overrun. This will
 shrink the buffer each time 10 consecutive overruns are detected. The buffer will not
@@ -123,6 +127,11 @@ sluice \-z \-u \-o \-r 1MB \-O myfifo
 Write random data at 5MB per second to file myfile doing a write every 0.1 seconds
 .RS 8
 sluice \-R \-r 5M \-c 0.1 > myfile
+.RE
+.LP
+Write zeros to the drive in 64K chunks and measure write rate as a crude throughput test
+.RS 8
+sluice \-nzSv \-f 0.1 \-i 64K > test
 .RE
 .SH AUTHOR
 sluice was written by Colin King <colin.king@canonical.com>

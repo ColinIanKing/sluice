@@ -65,6 +65,7 @@
 #define OPT_URANDOM		(0x00000200)
 #define OPT_APPEND		(0x00000400)
 #define OPT_STATS		(0x00000800)
+#define OPT_NO_RATE_CONTROL	(0x00001000)
 
 static int opt_flags;
 static const char *app_name = "sluice";
@@ -349,6 +350,7 @@ static void show_usage(void)
 	printf("  -h        print this help.\n");
 	printf("  -i size   set io read/write size in bytes.\n");
 	printf("  -m size   set maximum amount to process.\n");
+	printf("  -n        no rate controls, just copy data untouched.\n");
 	printf("  -o        shrink read/write buffer to avoid overrun.\n");
 	printf("  -O file   short cut for -dt file; output to a file.\n");
 	printf("  -r rate   set rate (in bytes per second).\n");
@@ -388,7 +390,7 @@ int main(int argc, char **argv)
 
 	for (;;) {
 		size_t len;
-		int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:S");
+		int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:Sn");
 		if (c == -1)
 			break;
 		switch (c) {
@@ -418,6 +420,9 @@ int main(int argc, char **argv)
 			break;
 		case 'm':
 			max_trans = get_uint64_byte(optarg);
+			break;
+		case 'n':
+			opt_flags |= OPT_NO_RATE_CONTROL;
 			break;
 		case 'o':
 			opt_flags |= OPT_OVERRUN;
@@ -463,11 +468,17 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if ((opt_flags & OPT_NO_RATE_CONTROL) &&
+            (opt_flags & (OPT_GOT_CONST_DELAY | OPT_GOT_RATE | OPT_UNDERRUN | OPT_OVERRUN))) {
+		fprintf(stderr, "Cannot use -n option with -c, -r, -u or -o options.\n");
+		goto tidy;
+	}
+
 	if (!filename && (opt_flags & OPT_APPEND)) {
 		fprintf(stderr, "Must use -t filename when using the -a option.\n");
 		goto tidy;
 	}
-	if (!(opt_flags & OPT_GOT_RATE)) {
+	if (!(opt_flags & (OPT_GOT_RATE | OPT_NO_RATE_CONTROL))) {
 		fprintf(stderr, "Must specify data rate with -r option.\n");
 		goto tidy;
 	}
@@ -476,7 +487,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Cannot use both -i and -c options together.\n");
 		goto tidy;
 	}
-	if (data_rate < 1) {
+	if ((opt_flags & OPT_GOT_RATE) && (data_rate < 1)) {
 		fprintf(stderr, "Rate value %" PRIu64 " too low.\n", data_rate);
 		goto tidy;
 	}
@@ -512,14 +523,18 @@ int main(int argc, char **argv)
 			}
 		}
 		else {
-			io_size = data_rate / 32;
-			/* Make sure we don't have small sized I/O */
-			if (io_size < KB)
-				io_size = KB;
-			if (io_size > IO_SIZE_MAX) {
-				fprintf(stderr, "Rate too high, maximum allowed: %" PRIu64 ".\n",
-					(uint64_t)IO_SIZE_MAX * 32);
-				goto tidy;
+			if (opt_flags & OPT_NO_RATE_CONTROL) {
+				io_size = 4 * KB;
+			} else {
+				io_size = data_rate / 32;
+				/* Make sure we don't have small sized I/O */
+				if (io_size < KB)
+					io_size = KB;
+				if (io_size > IO_SIZE_MAX) {
+					fprintf(stderr, "Rate too high, maximum allowed: %" PRIu64 ".\n",
+						(uint64_t)IO_SIZE_MAX * 32);
+					goto tidy;
+				}
 			}
 		}
 	}
@@ -569,10 +584,13 @@ int main(int argc, char **argv)
 	if ((secs_start = timeval_to_double()) < 0.0)
 		goto tidy;
 
-	if (opt_flags & OPT_GOT_CONST_DELAY)
+	if (opt_flags & OPT_NO_RATE_CONTROL) {
+		delay = 0;
+	} else if (opt_flags & OPT_GOT_CONST_DELAY) {
 		delay = 1000000 * const_delay;
-	else
+	} else {
 		delay = (int)(((double)io_size * 1000000) / (double)data_rate);
+	}
 	secs_last = secs_start;
 	stats.time_begin = secs_start;
 	stats.target_rate = data_rate;
@@ -586,7 +604,7 @@ int main(int argc, char **argv)
 		goto tidy;
 	}
 
-	while (!eof) {
+	while (!(eof | sluice_finish)) {
 		uint64_t current_rate, inbufsize = 0;
 		bool complete = false;
 		double secs_now;
@@ -664,79 +682,82 @@ int main(int argc, char **argv)
 		}
 		current_rate = (uint64_t)(((double)total_bytes) / (secs_now - secs_start));
 
-		if (current_rate > (double)data_rate) {
-			run = '+' ;
-			if (!(opt_flags & OPT_GOT_CONST_DELAY))
-				delay += ((last_delay >> delay_shift) + 100);
-			warnings = 0;
-			underruns = 0;
-			overruns++;
-			stats.overruns++;
-		} else if (current_rate < (double)data_rate) {
-			run = '-' ;
-			if (!(opt_flags & OPT_GOT_CONST_DELAY))
-				delay -= ((last_delay >> delay_shift) + 100);
-			warnings++;
-			underruns++;
-			stats.underruns++;
-			overruns = 0;
+		if (opt_flags & OPT_NO_RATE_CONTROL) {
+			run = '-';
 		} else {
-			/* Unlikely.. */
-			warnings = 0;
-			underruns = 0;
-			overruns = 0;
-			stats.perfect++;
-			run = '0';
-		}
-		if (delay < 0)
-			delay = 0;
-
-		if ((opt_flags & OPT_UNDERRUN) &&
-		    (underruns > underrun_adjust)) {
-			char *tmp;
-			uint64_t tmp_io_size = io_size + (io_size >> 2);
-
-			/* If size is too small, we get stuck at 1 */
-			if (tmp_io_size < 4)
-				tmp_io_size = 4;
-
-			if (tmp_io_size < IO_SIZE_MAX) {
-				tmp = realloc(buffer, tmp_io_size);
-				if (tmp) {
-					if (opt_flags & OPT_ZERO)
-						memset(tmp, 0, tmp_io_size);
-					buffer = tmp;
-					io_size = tmp_io_size;
-				}
+			if (current_rate > (double)data_rate) {
+				run = '+' ;
+				if (!(opt_flags & OPT_GOT_CONST_DELAY))
+					delay += ((last_delay >> delay_shift) + 100);
+				warnings = 0;
+				underruns = 0;
+				overruns++;
+				stats.overruns++;
+			} else if (current_rate < (double)data_rate) {
+				run = '-' ;
+				if (!(opt_flags & OPT_GOT_CONST_DELAY))
+					delay -= ((last_delay >> delay_shift) + 100);
+				warnings++;
+				underruns++;
+				stats.underruns++;
+				overruns = 0;
+			} else {
+				/* Unlikely.. */
+				warnings = 0;
+				underruns = 0;
+				overruns = 0;
+				stats.perfect++;
+				run = '0';
 			}
-			underruns = 0;
-		}
+			if (delay < 0)
+				delay = 0;
 
-		if ((opt_flags & OPT_OVERRUN) &&
-		    (overruns > overrun_adjust)) {
-			char *tmp;
-			uint64_t tmp_io_size = io_size - (io_size >> 2);
+			if ((opt_flags & OPT_UNDERRUN) &&
+			    (underruns > underrun_adjust)) {
+				char *tmp;
+				uint64_t tmp_io_size = io_size + (io_size >> 2);
 
-			if (tmp_io_size > IO_SIZE_MIN) {
-				tmp = realloc(buffer, tmp_io_size);
-				if (tmp) {
-					if (opt_flags & OPT_ZERO)
-						memset(tmp, 0, tmp_io_size);
-					buffer = tmp;
-					io_size = tmp_io_size;
+				/* If size is too small, we get stuck at 1 */
+				if (tmp_io_size < 4)
+					tmp_io_size = 4;
+
+				if (tmp_io_size < IO_SIZE_MAX) {
+					tmp = realloc(buffer, tmp_io_size);
+					if (tmp) {
+						if (opt_flags & OPT_ZERO)
+							memset(tmp, 0, tmp_io_size);
+						buffer = tmp;
+						io_size = tmp_io_size;
+					}
 				}
+				underruns = 0;
 			}
-			overruns = 0;
-		}
 
-		/* Too many continuous underruns? */
-		if ((opt_flags & OPT_WARNING) &&
-		    (warnings > UNDERRUN_MAX)) {
-			fprintf(stderr, "Warning: data underrun, "
-				"use larger I/O size (-i option)\n");
-			opt_flags &= ~OPT_WARNING;
-		}
+			if ((opt_flags & OPT_OVERRUN) &&
+			    (overruns > overrun_adjust)) {
+				char *tmp;
+				uint64_t tmp_io_size = io_size - (io_size >> 2);
 
+				if (tmp_io_size > IO_SIZE_MIN) {
+					tmp = realloc(buffer, tmp_io_size);
+					if (tmp) {
+						if (opt_flags & OPT_ZERO)
+							memset(tmp, 0, tmp_io_size);
+						buffer = tmp;
+						io_size = tmp_io_size;
+					}
+				}
+				overruns = 0;
+			}
+
+			/* Too many continuous underruns? */
+			if ((opt_flags & OPT_WARNING) &&
+			    (warnings > UNDERRUN_MAX)) {
+				fprintf(stderr, "Warning: data underrun, "
+					"use larger I/O size (-i option)\n");
+				opt_flags &= ~OPT_WARNING;
+			}
+		}
 		last_delay = delay;
 
 		/* Output feedback in verbose mode ~3 times a second */
