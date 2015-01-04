@@ -220,7 +220,7 @@ static void stats_info(stats_t *stats)
  *  timeval_to_double()
  *	convert timeval to seconds as a double
  */
-static inline double timeval_to_double(void)
+static double timeval_to_double(void)
 {
 	struct timeval tv;
 
