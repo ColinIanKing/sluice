@@ -73,6 +73,7 @@
 #define OPT_NO_RATE_CONTROL	(0x00001000)
 #define OPT_TIMED_RUN		(0x00002000)
 #define OPT_INPUT_FILE		(0x00004000)
+#define OPT_VERSION		(0x00008000)
 
 #define DRIFT_MAX		(7)
 
@@ -458,6 +459,7 @@ static void show_usage(void)
 	printf("  -T time   stop after a specified amount of time.\n");
 	printf("  -u        expand read/write buffer to avoid underrun.\n");
 	printf("  -v        set verbose mode (to stderr).\n");
+	printf("  -V        print version information.\n");
 	printf("  -w        warn on data rate underrun.\n");
 	printf("  -z        ignore stdin, generate zeros.\n");
 }
@@ -489,7 +491,7 @@ int main(int argc, char **argv)
 	stats_init(&stats);
 
 	for (;;) {
-		const int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:SnT:I:");
+		const int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:SnT:I:V");
 		size_t len;
 
 		if (c == -1)
@@ -561,6 +563,11 @@ int main(int argc, char **argv)
 			break;
 		case 'v':
 			opt_flags |= OPT_VERBOSE;
+			break;
+		case 'V':
+			opt_flags |= OPT_VERSION;
+			printf("%s: %s\n", app_name, VERSION);
+			exit(EXIT_SUCCESS);
 			break;
 		case 'w':
 			opt_flags |= OPT_WARNING;
