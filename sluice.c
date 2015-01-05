@@ -107,6 +107,17 @@ static void handle_sigint(int dummy)
 }
 
 /*
+ *  handle_siginfo()
+ *	catch SIGINFO/SIGUSR1, toggle verbose mode
+ */
+static void handle_siginfo(int dummy)
+{
+	(void)dummy;
+
+	opt_flags ^= OPT_VERBOSE;
+}
+
+/*
  *  stats_init()
  *	Initialize statistics
  */
@@ -226,11 +237,14 @@ static double timeval_to_double(void)
 {
 	struct timeval tv;
 
+redo:
+	errno = 0;
 	if (gettimeofday(&tv, NULL) < 0) {
-		if (errno != EINTR) {
-			fprintf(stderr, "gettimeofday error: errno=%d (%s).\n",
-				errno, strerror(errno));
-		}
+		if (errno == EINTR)	/* Should not occur */
+			goto redo;
+
+		fprintf(stderr, "gettimeofday error: errno=%d (%s).\n",
+			errno, strerror(errno));
 		return -1.0;
 	}
 	return (double)tv.tv_sec + ((double)tv.tv_usec / 1000000.0);
@@ -602,6 +616,7 @@ int main(int argc, char **argv)
 	stats.time_begin = secs_start;
 	stats.target_rate = data_rate;
 
+	memset(&new_action, 0, sizeof(new_action));
 	new_action.sa_handler = handle_sigint;
 	sigemptyset(&new_action.sa_mask);
 	new_action.sa_flags = 0;
@@ -610,6 +625,24 @@ int main(int argc, char **argv)
 			errno, strerror(errno));
 		goto tidy;
 	}
+
+	memset(&new_action, 0, sizeof(new_action));
+	new_action.sa_handler = handle_siginfo;
+	sigemptyset(&new_action.sa_mask);
+	new_action.sa_flags = 0;
+
+	if (sigaction(SIGUSR1, &new_action, NULL) < 0) {
+		fprintf(stderr, "Sigaction failed: errno=%d (%s).\n",
+			errno, strerror(errno));
+		goto tidy;
+	}
+#ifdef SIGINFO
+	if (sigaction(SIGINFO, &new_action, NULL) < 0) {
+		fprintf(stderr, "Sigaction failed: errno=%d (%s).\n",
+			errno, strerror(errno));
+		goto tidy;
+	}
+#endif
 
 	while (!(eof | sluice_finish)) {
 		uint64_t current_rate, inbufsize = 0;
@@ -634,9 +667,13 @@ int main(int argc, char **argv)
 
 				n = read(fdin, ptr, (ssize_t)sz);
 				if (n < 0) {
-					if ((errno == EINTR) && sluice_finish)
-						goto finish;
-					fprintf(stderr,"Read error: errno=%d (%s).\n",
+					if (errno == EINTR) {
+						if (sluice_finish)
+							goto finish;
+						/* read needs re-doing */
+						continue;
+					}
+					fprintf(stderr,"read error: errno=%d (%s).\n",
 						errno, strerror(errno));
 					goto tidy;
 				}
@@ -661,12 +698,18 @@ int main(int argc, char **argv)
 			}
 		}
 		if (fdtee >= 0) {
+redo_write:
 			if (write(fdtee, buffer, (size_t)inbufsize) < 0) {
-				if ((errno == EINTR) && sluice_finish)
-					goto finish;
-				fprintf(stderr, "Write error: errno=%d (%s).\n",
-					errno, strerror(errno));
-				goto tidy;
+				if (errno == EINTR) {
+					if (sluice_finish)
+						goto finish;
+					/* write needs re-doing */
+					goto redo_write;
+				} else {
+					fprintf(stderr, "write error: errno=%d (%s).\n",
+						errno, strerror(errno));
+					goto tidy;
+				}
 			}
 		}
 		if (eof || (max_trans && total_bytes >= max_trans))
@@ -674,19 +717,27 @@ int main(int argc, char **argv)
 
 		if (delay > 0) {
 			if (usleep(delay) < 0) {
-				if ((errno == EINTR) && sluice_finish)
-					goto finish;
-				fprintf(stderr, "usleep error: errno=%d (%s).\n",
-					errno, strerror(errno));
-				goto tidy;
+				if (errno == EINTR) {
+					if (sluice_finish)
+						goto finish;
+					/*
+					 * usleep got interrupted, let
+					 * subsequent I/O cater with the
+					 * delay deltas rather than
+					 * trying to figure out how much
+					 * time was lost on early exit
+					 * from usleep
+					 */
+				} else {
+					fprintf(stderr, "usleep error: errno=%d (%s).\n",
+						errno, strerror(errno));
+					goto tidy;
+				}
 			}
 		}
 
-		if ((secs_now = timeval_to_double()) < 0.0) {
-			if ((errno == EINTR) && sluice_finish)
-				goto finish;
+		if ((secs_now = timeval_to_double()) < 0.0)
 			goto tidy;
-		}
 		current_rate = (uint64_t)(((double)total_bytes) / (secs_now - secs_start));
 
 #if DEBUG_RATE
