@@ -1,3 +1,17 @@
+sluice (0.01.09-1) unstable; urgency=medium
+
+  * Makefile:  bump version
+  * Rephrase stats: Actual Rate -> Average Rate
+  * Add drift stats to -S option
+  * Add -T option to internal help info
+  * Add -T time option
+  * Add SIGUSR2 underrun/overrun toggle
+  * Add SIGUSR1/SIGINFO verbose mode toggle signal handling
+  * Fix -v mode comments, output rate is no longer @ 3 Hz
+  * Add magic -s 0 state that adjusts by delta of desired and current
+
+ -- Colin King <colin.king@canonical.com>  Mon, 5 Jan 2015 15:58:00 +0000
+
 sluice (0.01.08-1) unstable; urgency=medium
 
   * Makefile: bump version
@@ -14,7 +28,7 @@ sluice (0.01.08-1) unstable; urgency=medium
   * Re-organise size to string formatting helper functions
   * Remove longjmp, it causes -Wclobber issues
 
- -- Colin King <colin.king@canonical.com>  Sat, 4 Jan 2015 14:32:00 +0000
+ -- Colin King <colin.king@canonical.com>  Sun, 4 Jan 2015 14:32:00 +0000
 
 sluice (0.01.07-1) unstable; urgency=medium
 
