@@ -45,6 +45,9 @@ keep the data rate constant.
 .B \-d
 discard data, do not copy it to stdout. This makes sluice act as a data sink.
 .TP
+.B \-e
+ignore read errors. The failed read is replaced by zeros. Not fully tested.
+.TP
 .B \-f freq
 specify the frequency of \-v verbose statistics updates. The default is 1/4 of a second.
 .TP

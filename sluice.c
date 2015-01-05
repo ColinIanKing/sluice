@@ -76,6 +76,7 @@
 #define OPT_VERSION		(0x00008000)
 #define OPT_PROGRESS		(0x00010000)
 #define OPT_MAX_TRANS_SIZE	(0x00020000)
+#define OPT_SKIP_READ_ERRORS	(0x00040000)
 
 #define DRIFT_MAX		(7)
 
@@ -446,6 +447,7 @@ static void show_usage(void)
 	printf("  -a        append to file (-t, -O options only).\n");
 	printf("  -c delay  specify constant delay time (seconds).\n");
 	printf("  -d        discard input (no output).\n");
+	printf("  -e        skip read errors.\n");
 	printf("  -f freq   frequency of -v statistics.\n");
 	printf("  -h        print this help.\n");
 	printf("  -i size   set io read/write size in bytes.\n");
@@ -495,7 +497,7 @@ int main(int argc, char **argv)
 	stats_init(&stats);
 
 	for (;;) {
-		const int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:SnT:I:Vp");
+		const int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:SnT:I:Vpe");
 		size_t len;
 
 		if (c == -1)
@@ -514,6 +516,9 @@ int main(int argc, char **argv)
 			break;
 		case 'd':
 			opt_flags |= OPT_DISCARD_STDOUT;
+			break;
+		case 'e':
+			opt_flags |= OPT_SKIP_READ_ERRORS;
 			break;
 		case 'f':
 			freq = atof(optarg);
@@ -807,9 +812,14 @@ int main(int argc, char **argv)
 						/* read needs re-doing */
 						continue;
 					}
-					fprintf(stderr,"read error: errno=%d (%s).\n",
-						errno, strerror(errno));
-					goto tidy;
+					if (opt_flags & OPT_SKIP_READ_ERRORS) {
+						memset(ptr, 0, sz);
+						n = sz;
+					} else {
+						fprintf(stderr,"read error: errno=%d (%s).\n",
+							errno, strerror(errno));
+						goto tidy;
+					}
 				}
 				if (n == 0) {
 					eof = true;
