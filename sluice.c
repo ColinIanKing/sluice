@@ -118,6 +118,17 @@ static void handle_siginfo(int dummy)
 }
 
 /*
+ *  handle_sigusr2()
+ *	catch SIGUSR2, toggle underflow/overflow
+ */
+static void handle_sigusr2(int dummy)
+{
+	(void)dummy;
+
+	opt_flags ^= (OPT_OVERRUN | OPT_UNDERRUN);
+}
+
+/*
  *  stats_init()
  *	Initialize statistics
  */
@@ -630,7 +641,6 @@ int main(int argc, char **argv)
 	new_action.sa_handler = handle_siginfo;
 	sigemptyset(&new_action.sa_mask);
 	new_action.sa_flags = 0;
-
 	if (sigaction(SIGUSR1, &new_action, NULL) < 0) {
 		fprintf(stderr, "Sigaction failed: errno=%d (%s).\n",
 			errno, strerror(errno));
@@ -643,6 +653,15 @@ int main(int argc, char **argv)
 		goto tidy;
 	}
 #endif
+	memset(&new_action, 0, sizeof(new_action));
+	new_action.sa_handler = handle_sigusr2;
+	sigemptyset(&new_action.sa_mask);
+	new_action.sa_flags = 0;
+	if (sigaction(SIGUSR2, &new_action, NULL) < 0) {
+		fprintf(stderr, "Sigaction failed: errno=%d (%s).\n",
+			errno, strerror(errno));
+		goto tidy;
+	}
 
 	while (!(eof | sluice_finish)) {
 		uint64_t current_rate, inbufsize = 0;

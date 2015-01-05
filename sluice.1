@@ -109,6 +109,13 @@ warn if a long burst of continuous data rate underrun occurs, the warning is iss
 .TP
 .B \-z
 don't read from stdin, instead generate a stream of zeros.
+.TP
+.B SIGUSR1 SIGINFO
+Sending SIGUSR1 (or SIGINFO on BSD systems) will toggle the verbose data rate mode on/off.
+.TP
+.TP
+.B SIGUSR2
+Toggle underrun/overrun (-u, -o) options on/off.
 .SH EXAMPLES
 .LP
 Read /dev/zero and write in 4K sizes at the rate of 1MB/sec to the file example.dat
