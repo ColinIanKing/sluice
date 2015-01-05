@@ -102,6 +102,7 @@ typedef struct {
 	double		buf_size_total;	/* For average buffer size */
 	double		rate_min;	/* Minimum rate */
 	double		rate_max;	/* Maximum rate */
+	bool		rate_set;	/* Min/max set or not? */
 } stats_t;
 
 /*
@@ -155,8 +156,9 @@ static inline void stats_init(stats_t *const stats)
 	stats->time_end = 0.0;
 	stats->target_rate = 0.0;
 	stats->buf_size_total = 0.0;
-	stats->rate_min = DBL_MAX;
-	stats->rate_max = DBL_MIN;
+	stats->rate_min = 0.0;
+	stats->rate_max = 0.0;
+	stats->rate_set = false;
 }
 
 /*
@@ -247,13 +249,15 @@ static void stats_info(const stats_t *stats)
 		int percent = 1 << i;
 		fprintf(stderr, "  %5.2f%% - %5.2f%%: %6.2f%%\n",
 			(double)last_percent, (double)percent - 0.01,
-			100.0 * (double)stats->drift[i] / (double)stats->drift_total);
+			stats->drift_total ? 
+				100.0 * (double)stats->drift[i] / (double)stats->drift_total : 0.0);
 		last_percent = percent;
 		drift_sum += stats->drift[i];
 	}
 	fprintf(stderr, " >%5.2f%%         : %6.2f%%\n",
 		(double)last_percent,
-		100.0 - ((100.0 * (double)drift_sum) / (double)stats->drift_total));
+		stats->drift_total ?
+			100.0 - ((100.0 * (double)drift_sum) / (double)stats->drift_total) : 0.0);
 
 	fprintf(stderr, "Overruns:        %3.2f%%\n", total ?
 		100.0 * (double)stats->underruns / total : 0.0);
@@ -814,10 +818,16 @@ redo_write:
 			goto tidy;
 		current_rate = (uint64_t)(((double)total_bytes) / (secs_now - secs_start));
 
-		if (current_rate > stats.rate_max)
-			stats.rate_max = current_rate;
-		if (current_rate < stats.rate_min)
+		if (stats.rate_set) {
+			if (current_rate > stats.rate_max)
+				stats.rate_max = current_rate;
+			if (current_rate < stats.rate_min)
+				stats.rate_min = current_rate;
+		} else {
 			stats.rate_min = current_rate;
+			stats.rate_max = current_rate;
+			stats.rate_set = true;
+		}
 
 		drift_rate = 100.0 * fabs((double)current_rate - (double)data_rate) / data_rate;
 		stats.drift_total++;
