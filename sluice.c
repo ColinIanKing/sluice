@@ -280,9 +280,9 @@ static void stats_info(const stats_t *stats)
 			(double)last_percent,
 			stats->drift_total ?
 				100.0 - ((100.0 * (double)drift_sum) / (double)stats->drift_total) : 0.0);
-		fprintf(stderr, "Overruns:        %3.2f%%\n", total ?
+		fprintf(stderr, "Overruns:        %5.2f%%\n", total ?
 			100.0 * (double)stats->underruns / total : 0.0);
-		fprintf(stderr, "Underruns:       %3.2f%%\n", total ?
+		fprintf(stderr, "Underruns:       %5.2f%%\n", total ?
 			100.0 * (double)stats->overruns / total : 0.0);
 	}
 
