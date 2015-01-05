@@ -109,7 +109,8 @@ be expanded any more than 4MB in size.
 write verbose statistics to stderr
 .TP
 .B \-w
-warn if a long burst of continuous data rate underrun occurs, the warning is issued just once.  To overcome the underrun increase the \-i read/write buffer size or use the \-u option to auto-expand the read/write buffer.
+warn if a long burst of continuous data rate underrun occurs, the warning is issued just once.  To overcome the underrun increase the \-i read/write buffer size or use the \-u option to auto-expand the read/write buffer.  Too many underruns implies
+that too small a buffer or not enough CPU is available to keep up with the required data rate.
 .TP
 .B \-z
 don't read from stdin, instead generate a stream of zeros.
