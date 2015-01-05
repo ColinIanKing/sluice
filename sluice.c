@@ -807,7 +807,7 @@ int main(int argc, char **argv)
 		}
 		last_delay = delay;
 
-		/* Output feedback in verbose mode ~3 times a second */
+		/* Output feedback in verbose mode */
 		if ((opt_flags & OPT_VERBOSE) &&
 		    (secs_now > secs_last + freq)) {
 			char current_rate_str[32];
