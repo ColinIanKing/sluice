@@ -150,6 +150,7 @@ static inline void stats_init(stats_t *const stats)
 	stats->overruns = 0;
 	stats->perfect = 0;
 	memset(&stats->drift, 0, sizeof(stats->drift));
+	stats->drift_total = 0;
 	stats->time_begin = 0.0;
 	stats->time_end = 0.0;
 	stats->target_rate = 0.0;
