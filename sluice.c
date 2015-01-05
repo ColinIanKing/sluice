@@ -72,10 +72,11 @@
 #define OPT_STATS		(0x00000800)
 #define OPT_NO_RATE_CONTROL	(0x00001000)
 #define OPT_TIMED_RUN		(0x00002000)
+#define OPT_INPUT_FILE		(0x00004000)
 
 #define DRIFT_MAX		(7)
 
-static int opt_flags;
+static unsigned int opt_flags;
 static const char *app_name = "sluice";
 static const char *dev_urandom = "/dev/urandom";
 static volatile bool sluice_finish = false;
@@ -104,6 +105,19 @@ typedef struct {
 	double		rate_max;	/* Maximum rate */
 	bool		rate_set;	/* Min/max set or not? */
 } stats_t;
+
+/*
+ *  count_bits()
+ *      count bits set, from C Programming Language 2nd Ed
+ */
+static unsigned int count_bits(const unsigned int val)
+{
+	register unsigned int c, n = val;
+
+	for (c = 0; n; c++)
+		n &= n - 1;
+	return c;
+}
 
 /*
  *  handle_sigint()
@@ -452,7 +466,8 @@ int main(int argc, char **argv)
 {
 	char run = ' ';			/* Overrun/underrun flag */
 	char *buffer = NULL;		/* Temp I/O buffer */
-	char *filename = NULL;		/* -t option filename */
+	char *out_filename = NULL;	/* -t or -O option filename */
+	char *in_filename = NULL;	/* -I option filename */
 	int64_t delay, last_delay = 0;	/* Delays in 1/1000000 of a second */
 	uint64_t io_size = 0;
 	uint64_t data_rate = 0;
@@ -474,7 +489,7 @@ int main(int argc, char **argv)
 	stats_init(&stats);
 
 	for (;;) {
-		const int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:SnT:");
+		const int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:SnT:I:");
 		size_t len;
 
 		if (c == -1)
@@ -501,8 +516,12 @@ int main(int argc, char **argv)
 			show_usage();
 			exit(EXIT_SUCCESS);
 		case 'i':
-			io_size = get_uint64_byte(optarg);
 			opt_flags |= OPT_GOT_IOSIZE;
+			io_size = get_uint64_byte(optarg);
+			break;
+		case 'I':
+			opt_flags |= OPT_INPUT_FILE;
+			in_filename = optarg;
 			break;
 		case 'm':
 			max_trans = get_uint64_byte(optarg);
@@ -515,7 +534,7 @@ int main(int argc, char **argv)
 			break;
 		case 'O':
 			opt_flags |= OPT_DISCARD_STDOUT;
-			filename = optarg;
+			out_filename = optarg;
 			break;
 		case 'r':
 			data_rate = get_uint64_byte(optarg);
@@ -531,7 +550,7 @@ int main(int argc, char **argv)
 			opt_flags |= OPT_STATS;
 			break;
 		case 't':
-			filename = optarg;
+			out_filename = optarg;
 			break;
 		case 'T':
 			opt_flags |= OPT_TIMED_RUN;
@@ -564,7 +583,7 @@ int main(int argc, char **argv)
 		goto tidy;
 	}
 
-	if (!filename && (opt_flags & OPT_APPEND)) {
+	if (!out_filename && (opt_flags & OPT_APPEND)) {
 		fprintf(stderr, "Must use -t filename when using the -a option.\n");
 		goto tidy;
 	}
@@ -647,20 +666,16 @@ int main(int argc, char **argv)
 	if (opt_flags & OPT_ZERO)
 		memset(buffer, 0, io_size);
 
-	if ((opt_flags & (OPT_ZERO | OPT_URANDOM)) ==
-		(OPT_ZERO | OPT_URANDOM)) {
-		fprintf(stderr, "Cannot use both -z and -R options together.\n");
+	if (count_bits(opt_flags & (OPT_ZERO | OPT_URANDOM | OPT_INPUT_FILE)) > 1) {
+		fprintf(stderr, "Cannot use -z, -R or -I options together.\n");
 		goto tidy;
 	}
 
-	if (filename) {
-		int open_flags = (opt_flags & OPT_APPEND) ? O_APPEND : O_TRUNC;
-
-		(void)umask(0077);
-		fdtee = open(filename, O_CREAT | open_flags | O_WRONLY, S_IRUSR | S_IWUSR);
-		if (fdtee < 0) {
+	if (opt_flags & OPT_INPUT_FILE) {
+		fdin = open(in_filename, O_RDONLY);
+		if (fdin < 0) {
 			fprintf(stderr, "open on %s failed: errno = %d (%s).\n",
-				filename, errno, strerror(errno));
+				in_filename, errno, strerror(errno));
 			goto tidy;
 		}
 	}
@@ -671,9 +686,21 @@ int main(int argc, char **argv)
 				dev_urandom, errno, strerror(errno));
 			goto tidy;
 		}
-	} else {
-		fdin = fileno(stdin);
 	}
+	if (out_filename) {
+		int open_flags = (opt_flags & OPT_APPEND) ? O_APPEND : O_TRUNC;
+
+		(void)umask(0077);
+		fdtee = open(out_filename, O_CREAT | open_flags | O_WRONLY, S_IRUSR | S_IWUSR);
+		if (fdtee < 0) {
+			fprintf(stderr, "open on %s failed: errno = %d (%s).\n",
+				out_filename, errno, strerror(errno));
+			goto tidy;
+		}
+	}
+
+	if (fdin == -1)
+		fdin = fileno(stdin);
 	fdout = fileno(stdout);
 
 	if ((secs_start = timeval_to_double()) < 0.0)
