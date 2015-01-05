@@ -235,7 +235,7 @@ static void stats_info(const stats_t *stats)
 		secs);
 	fprintf(stderr, "Target rate:     %s/sec\n",
 		double_to_str(stats->target_rate));
-	fprintf(stderr, "Actual rate:     %s/sec\n",
+	fprintf(stderr, "Average rate:    %s/sec\n",
 		double_to_str((double)stats->total_bytes / secs));
 	fprintf(stderr, "Minimum rate:    %s/sec\n",
 		double_to_str(stats->rate_min));
@@ -250,7 +250,7 @@ static void stats_info(const stats_t *stats)
 		last_percent = percent;
 		drift_sum += stats->drift[i];
 	}
-	fprintf(stderr, " >%6.2f%%          : %6.2f%%\n",
+	fprintf(stderr, " >%5.2f%%         : %6.2f%%\n",
 		(double)last_percent,
 		100.0 - ((100.0 * (double)drift_sum) / (double)stats->drift_total));
 
