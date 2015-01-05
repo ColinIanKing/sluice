@@ -402,6 +402,7 @@ static void show_usage(void)
 	printf("  -s shift  controls delay or buffer size adjustment.\n");
 	printf("  -S        display statistics at end of stream to stderr.\n");
 	printf("  -t file   tee output to file.\n");
+	printf("  -T time   stop after a specified amount of time.\n");
 	printf("  -u        expand read/write buffer to avoid underrun.\n");
 	printf("  -v        set verbose mode (to stderr).\n");
 	printf("  -w        warn on data rate underrun.\n");
