@@ -28,6 +28,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <ctype.h>
+#include <math.h>
 #include <signal.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -42,7 +43,7 @@
 #define UNDERRUN_ADJUST_MAX	(2)
 #define OVERRUN_ADJUST_MAX	(2)
 
-#define DELAY_SHIFT_MIN		(1)
+#define DELAY_SHIFT_MIN		(0)
 #define DELAY_SHIFT_MAX		(16)
 
 #define IO_SIZE_MAX		(MB * 64)
@@ -496,7 +497,12 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Frequency too low.\n");
 		goto tidy;
 	}
+
+#if DELAY_SHIFT_MIN > 0
 	if (adjust_shift < DELAY_SHIFT_MIN || adjust_shift > DELAY_SHIFT_MAX) {
+#else
+	if (adjust_shift > DELAY_SHIFT_MAX) {
+#endif
 		fprintf(stderr, "Delay shift must be %d .. %d.\n",
 			DELAY_SHIFT_MIN, DELAY_SHIFT_MAX);
 		goto tidy;
@@ -692,16 +698,32 @@ int main(int argc, char **argv)
 		} else {
 			if (current_rate > (double)data_rate) {
 				run = '+' ;
-				if (!(opt_flags & OPT_GOT_CONST_DELAY))
-					delay += ((last_delay >> adjust_shift) + 100);
+				if (!(opt_flags & OPT_GOT_CONST_DELAY)) {
+					if (adjust_shift)
+						delay += ((last_delay >> adjust_shift) + 100);
+					else {
+						double d1 = (double)(total_bytes) / (double)current_rate;
+						double d2 = (double)(total_bytes + inbufsize) / (double)data_rate;
+
+						delay += 1000000.0 * fabs(d1 - d2);
+					}
+				}
 				warnings = 0;
 				underruns = 0;
 				overruns++;
 				stats.overruns++;
 			} else if (current_rate < (double)data_rate) {
 				run = '-' ;
-				if (!(opt_flags & OPT_GOT_CONST_DELAY))
-					delay -= ((last_delay >> adjust_shift) + 100);
+				if (!(opt_flags & OPT_GOT_CONST_DELAY)) {
+					if (adjust_shift)
+						delay -= ((last_delay >> adjust_shift) + 100);
+					else {
+						double d1 = (double)(total_bytes) / (double)current_rate;
+						double d2 = (double)(total_bytes + inbufsize) / (double)data_rate;
+
+						delay -= 1000000.0 * fabs(d1 - d2);
+					}
+				}
 				warnings++;
 				underruns++;
 				stats.underruns++;
@@ -720,7 +742,17 @@ int main(int argc, char **argv)
 			if ((opt_flags & OPT_UNDERRUN) &&
 			    (underruns > underrun_adjust)) {
 				char *tmp;
-				uint64_t tmp_io_size = io_size + (io_size >> adjust_shift);
+				uint64_t tmp_io_size;
+
+				if (adjust_shift) {
+					tmp_io_size = io_size + (io_size >> adjust_shift);
+				} else {
+					uint64_t io_size_current = (KB * current_rate * const_delay) / KB;
+					uint64_t io_size_desired = (KB * data_rate * const_delay) / KB;
+					int64_t delta = llabs(io_size_desired - io_size_current);
+
+					tmp_io_size = io_size + delta;
+				}
 
 				/* If size is too small, we get stuck at 1 */
 				if (tmp_io_size < 4)
@@ -741,7 +773,17 @@ int main(int argc, char **argv)
 			if ((opt_flags & OPT_OVERRUN) &&
 			    (overruns > overrun_adjust)) {
 				char *tmp;
-				uint64_t tmp_io_size = io_size - (io_size >> adjust_shift);
+				uint64_t tmp_io_size;
+
+				if (adjust_shift) {
+					tmp_io_size = io_size - (io_size >> adjust_shift);
+				} else {
+					uint64_t io_size_current = (KB * current_rate * const_delay) / KB;
+					uint64_t io_size_desired = (KB * data_rate * const_delay) / KB;
+					int64_t delta = llabs(io_size_desired - io_size_current);
+
+					tmp_io_size = io_size - delta;
+				}
 
 				if (tmp_io_size > IO_SIZE_MIN) {
 					tmp = realloc(buffer, tmp_io_size);
