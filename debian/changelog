@@ -1,3 +1,14 @@
+sluice (0.01.11-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Add SEE ALSO section to manual
+  * Correct formatting of min/max stats
+  * Add -e error skip option
+  * Add -p option
+  * Add -V version info option
+
+ -- Colin King <colin.king@canonical.com>  Mon, 5 Jan 2015 19:51:00 +0000
+
 sluice (0.01.10-1) unstable; urgency=medium
 
   * Makefile: bump version
