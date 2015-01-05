@@ -74,6 +74,8 @@
 #define OPT_TIMED_RUN		(0x00002000)
 #define OPT_INPUT_FILE		(0x00004000)
 #define OPT_VERSION		(0x00008000)
+#define OPT_PROGRESS		(0x00010000)
+#define OPT_MAX_TRANS_SIZE	(0x00020000)
 
 #define DRIFT_MAX		(7)
 
@@ -190,7 +192,7 @@ static void size_to_str(
 	int i;
 
 	static char *sizes[] = {
-		"B",	/* Bytes */
+		"B ",	/* Bytes */
 		"KB",	/* Kilobytes */
 		"MB",	/* Megabytes */
 		"GB",	/* Gigabytes */
@@ -451,6 +453,7 @@ static void show_usage(void)
 	printf("  -n        no rate controls, just copy data untouched.\n");
 	printf("  -o        shrink read/write buffer to avoid overrun.\n");
 	printf("  -O file   short cut for -dt file; output to a file.\n");
+	printf("  -p        enable verbose mode with progress stats.\n");
 	printf("  -r rate   set rate (in bytes per second).\n");
 	printf("  -R	    ignore stdin, read from %s.\n", dev_urandom);
 	printf("  -s shift  controls delay or buffer size adjustment.\n");
@@ -475,6 +478,7 @@ int main(int argc, char **argv)
 	uint64_t data_rate = 0;
 	uint64_t total_bytes = 0;
 	uint64_t max_trans = 0;
+	off_t progress_size = 0;
 	uint64_t adjust_shift = 3;
 	uint64_t timed_run = 0;
 	int underrun_adjust = UNDERRUN_ADJUST_MAX;
@@ -491,7 +495,7 @@ int main(int argc, char **argv)
 	stats_init(&stats);
 
 	for (;;) {
-		const int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:SnT:I:V");
+		const int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:SnT:I:Vp");
 		size_t len;
 
 		if (c == -1)
@@ -526,6 +530,7 @@ int main(int argc, char **argv)
 			in_filename = optarg;
 			break;
 		case 'm':
+			opt_flags |= OPT_MAX_TRANS_SIZE;
 			max_trans = get_uint64_byte(optarg);
 			break;
 		case 'n':
@@ -537,6 +542,9 @@ int main(int argc, char **argv)
 		case 'O':
 			opt_flags |= OPT_DISCARD_STDOUT;
 			out_filename = optarg;
+			break;
+		case 'p':
+			opt_flags |= (OPT_PROGRESS | OPT_VERBOSE);
 			break;
 		case 'r':
 			data_rate = get_uint64_byte(optarg);
@@ -679,13 +687,23 @@ int main(int argc, char **argv)
 	}
 
 	if (opt_flags & OPT_INPUT_FILE) {
+		struct stat buf;
+
 		fdin = open(in_filename, O_RDONLY);
 		if (fdin < 0) {
 			fprintf(stderr, "open on %s failed: errno = %d (%s).\n",
 				in_filename, errno, strerror(errno));
 			goto tidy;
 		}
+		if (fstat(fdin, &buf) < 0) {
+			fprintf(stderr, "fstat on file %s failed: errnp = %d (%s).\n",
+				in_filename, errno, strerror(errno));
+		}
+		progress_size = buf.st_size;
 	}
+	if (opt_flags & OPT_MAX_TRANS_SIZE)
+		progress_size = (off_t)max_trans;
+
 	if (opt_flags & OPT_URANDOM) {
 		fdin = open(dev_urandom, O_RDONLY);
 		if (fdin < 0) {
@@ -1003,7 +1021,6 @@ redo_write:
 		    (secs_now > secs_last + freq)) {
 			char current_rate_str[32];
 			char total_bytes_str[32];
-			char io_size_str[32];
 
 			size_to_str(current_rate, "%7.1f %s",
 				current_rate_str,
@@ -1011,14 +1028,37 @@ redo_write:
 			size_to_str(total_bytes, "%7.1f %s",
 				total_bytes_str,
 				sizeof(total_bytes_str));
-			size_to_str(io_size, "%7.1f %s",
-				io_size_str,
-				sizeof(io_size_str));
 
-			fprintf(stderr,"Rate: %s/S, Adj: %c, "
-				"Total: %s, Dur: %.1f S, Buf: %s  \r",
-				current_rate_str, run, total_bytes_str,
-				secs_now - secs_start, io_size_str);
+			if (opt_flags & OPT_PROGRESS) {
+				/* Progress % and ETA estimates */
+				double secs = secs_now - secs_start;
+				if (progress_size) {
+					double percent = 100.0 * (double)stats.total_bytes / (double)progress_size;
+					double alpha = secs * (double)progress_size / (double)stats.total_bytes;
+					double secs_left = alpha - secs;
+
+					fprintf(stderr,"Rate: %s/S, "
+						"Total: %s, Dur: %.1f S, %5.1f%% ETA: %.1f S  \r",
+						current_rate_str, total_bytes_str, secs,
+						percent, secs_left);
+				} else {
+					/* No size, avoid division by zero */
+					fprintf(stderr,"Rate: %s/S, "
+						"Total: %s, Dur: %.1f S, ??.?%% ETA: ?.? S  \r",
+						current_rate_str, total_bytes_str, secs);
+				}
+			} else {
+				/* Default progress info */
+				char io_size_str[32];
+
+				size_to_str(io_size, "%7.1f %s",
+					io_size_str,
+					sizeof(io_size_str));
+				fprintf(stderr,"Rate: %s/S, Adj: %c, "
+					"Total: %s, Dur: %.1f S, Buf: %s  \r",
+					current_rate_str, run, total_bytes_str,
+					secs_now - secs_start, io_size_str);
+			}
 			(void)fflush(stderr);
 			secs_last = secs_now;
 		}
