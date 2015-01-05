@@ -164,6 +164,10 @@ sluice \-nzSv \-f 0.1 \-i 64K > test
 Stopping and starting sluice using SIGSTOP and SIGCONT will interfere with the internal buffering
 rate calculations causing sluice to try to catch up and this may affect the short term data rate
 immediately after the SIGCONT.
+.SH SEE ALSO
+.BR cat(1),
+.BR pv(1),
+.BR cstream(1)
 .SH AUTHOR
 sluice was written by Colin King <colin.king@canonical.com>
 .PP
