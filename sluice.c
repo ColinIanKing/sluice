@@ -29,7 +29,9 @@
 #include <errno.h>
 #include <ctype.h>
 #include <math.h>
+#include <float.h>
 #include <signal.h>
+#include <limits.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -71,6 +73,8 @@
 #define OPT_NO_RATE_CONTROL	(0x00001000)
 #define OPT_TIMED_RUN		(0x00002000)
 
+#define DRIFT_MAX		(7)
+
 static int opt_flags;
 static const char *app_name = "sluice";
 static const char *dev_urandom = "/dev/urandom";
@@ -90,10 +94,14 @@ typedef struct {
 	uint64_t	underruns;	/* Count of underruns */
 	uint64_t	overruns;	/* Count of overruns */
 	uint64_t	perfect;	/* Count of no under/overruns */
+	uint64_t	drift[DRIFT_MAX];/* Drift from desired rate */
+	uint64_t	drift_total;	/* Number of drift samples */
 	double		time_begin;	/* Time began */
 	double		time_end;	/* Time ended */
 	double		target_rate;	/* Target transfer rate */
 	double		buf_size_total;	/* For average buffer size */
+	double		rate_min;	/* Minimum rate */
+	double		rate_max;	/* Maximum rate */
 } stats_t;
 
 /*
@@ -141,10 +149,13 @@ static inline void stats_init(stats_t *const stats)
 	stats->underruns = 0;
 	stats->overruns = 0;
 	stats->perfect = 0;
+	memset(&stats->drift, 0, sizeof(stats->drift));
 	stats->time_begin = 0.0;
 	stats->time_end = 0.0;
 	stats->target_rate = 0.0;
 	stats->buf_size_total = 0.0;
+	stats->rate_min = DBL_MAX;
+	stats->rate_max = DBL_MIN;
 }
 
 /*
@@ -203,6 +214,8 @@ static void stats_info(const stats_t *stats)
 	double secs = stats->time_end - stats->time_begin;
 	double avg_wr_sz;
 	struct tms t;
+	int i, last_percent = 0;
+	uint64_t drift_sum = 0;
 
 	if (secs <= 0.0)  {
 		fprintf(stderr, "Cannot compute statistics\n");
@@ -224,6 +237,23 @@ static void stats_info(const stats_t *stats)
 		double_to_str(stats->target_rate));
 	fprintf(stderr, "Actual rate:     %s/sec\n",
 		double_to_str((double)stats->total_bytes / secs));
+	fprintf(stderr, "Minimum rate:    %s/sec\n",
+		double_to_str(stats->rate_min));
+	fprintf(stderr, "Maximum rate:    %s/sec\n",
+		double_to_str(stats->rate_max));
+	fprintf(stderr, "Drift from target rate: (%%)\n");
+	for (i = 0; i < DRIFT_MAX; i++) {
+		int percent = 1 << i;
+		fprintf(stderr, "  %5.2f%% - %5.2f%%: %6.2f%%\n",
+			(double)last_percent, (double)percent - 0.01,
+			100.0 * (double)stats->drift[i] / (double)stats->drift_total);
+		last_percent = percent;
+		drift_sum += stats->drift[i];
+	}
+	fprintf(stderr, " >%6.2f%%          : %6.2f%%\n",
+		(double)last_percent,
+		100.0 - ((100.0 * (double)drift_sum) / (double)stats->drift_total));
+
 	fprintf(stderr, "Overruns:        %3.2f%%\n", total ?
 		100.0 * (double)stats->underruns / total : 0.0);
 	fprintf(stderr, "Underruns:       %3.2f%%\n", total ?
@@ -423,7 +453,7 @@ int main(int argc, char **argv)
 	uint64_t timed_run = 0;
 	int underrun_adjust = UNDERRUN_ADJUST_MAX;
 	int overrun_adjust = OVERRUN_ADJUST_MAX;
-	int fdin = -1, fdout, fdtee = -1;
+	int fdin = -1, fdout, fdtee = -1, i;
 	int underruns = 0, overruns = 0, warnings = 0;
 	int ret = EXIT_FAILURE;
 	double secs_start, secs_last, freq = DEFAULT_FREQ;
@@ -690,7 +720,7 @@ int main(int argc, char **argv)
 	while (!(eof | sluice_finish)) {
 		uint64_t current_rate, inbufsize = 0;
 		bool complete = false;
-		double secs_now;
+		double secs_now, drift_rate;
 
 		if (opt_flags & OPT_ZERO) {
 			inbufsize = io_size;
@@ -783,6 +813,20 @@ redo_write:
 			goto tidy;
 		current_rate = (uint64_t)(((double)total_bytes) / (secs_now - secs_start));
 
+		if (current_rate > stats.rate_max)
+			stats.rate_max = current_rate;
+		if (current_rate < stats.rate_min)
+			stats.rate_min = current_rate;
+
+		drift_rate = 100.0 * fabs((double)current_rate - (double)data_rate) / data_rate;
+		stats.drift_total++;
+		for (i = 0; i < DRIFT_MAX; i++) {
+			int percent = 1 << i;
+			if (drift_rate < (double)percent) {
+				stats.drift[i]++;
+				break;
+			}
+		}
 #if DEBUG_RATE
 		fprintf(stderr, "%" PRIu64 "\n", current_rate);
 #endif
