@@ -69,6 +69,7 @@
 #define OPT_APPEND		(0x00000400)
 #define OPT_STATS		(0x00000800)
 #define OPT_NO_RATE_CONTROL	(0x00001000)
+#define OPT_TIMED_RUN		(0x00002000)
 
 static int opt_flags;
 static const char *app_name = "sluice";
@@ -362,6 +363,23 @@ static uint64_t get_uint64_byte(const char *const str)
 }
 
 /*
+ *  get_uint64_time()
+ *	time in seconds, minutes, hours, days or years
+ */
+uint64_t get_uint64_time(const char *const str)
+{
+	static const scale_t scales[] = {
+		{ 's',  1 },
+		{ 'm',  60 },
+		{ 'h',  3600 },
+		{ 'd',  24 * 3600 },
+		{ 'y',  365 * 24 * 3600 },
+	};
+
+	return get_uint64_scale(str, scales, "time");
+}
+
+/*
  *  show_usage()
  *	show options
  */
@@ -401,6 +419,7 @@ int main(int argc, char **argv)
 	uint64_t total_bytes = 0;
 	uint64_t max_trans = 0;
 	uint64_t adjust_shift = 3;
+	uint64_t timed_run = 0;
 	int underrun_adjust = UNDERRUN_ADJUST_MAX;
 	int overrun_adjust = OVERRUN_ADJUST_MAX;
 	int fdin = -1, fdout, fdtee = -1;
@@ -415,7 +434,7 @@ int main(int argc, char **argv)
 	stats_init(&stats);
 
 	for (;;) {
-		const int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:Sn");
+		const int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:SnT:");
 		size_t len;
 
 		if (c == -1)
@@ -473,6 +492,10 @@ int main(int argc, char **argv)
 			break;
 		case 't':
 			filename = optarg;
+			break;
+		case 'T':
+			opt_flags |= OPT_TIMED_RUN;
+			timed_run = get_uint64_time(optarg);
 			break;
 		case 'u':
 			opt_flags |= OPT_UNDERRUN;
@@ -901,6 +924,10 @@ redo_write:
 			(void)fflush(stderr);
 			secs_last = secs_now;
 		}
+
+		if ((opt_flags & OPT_TIMED_RUN) &&
+		    ((secs_now - secs_start) > timed_run))
+			break;
 	}
 	ret = EXIT_SUCCESS;
 
