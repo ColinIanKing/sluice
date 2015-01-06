@@ -995,8 +995,8 @@ redo_write:
 				}
 
 				/* If size is too small, we get stuck at 1 */
-				if (tmp_io_size < 4)
-					tmp_io_size = 4;
+				if (tmp_io_size < 1)
+					tmp_io_size = 1;
 
 				if (tmp_io_size < IO_SIZE_MAX) {
 					tmp = realloc(buffer, tmp_io_size);
