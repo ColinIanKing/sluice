@@ -77,6 +77,7 @@
 #define OPT_PROGRESS		(0x00010000)	/* -p */
 #define OPT_MAX_TRANS_SIZE	(0x00020000)	/* -m */
 #define OPT_SKIP_READ_ERRORS	(0x00040000)	/* -e */
+#define OPT_GOT_SHIFT		(0x00080000)	/* -s */
 
 /* scaling factor */
 typedef struct {
@@ -502,7 +503,7 @@ int main(int argc, char **argv)
 	double data_rate = 0.0;		/* -r data rate */
 	uint64_t total_bytes = 0;	/* cumulative number of bytes read */
 	uint64_t max_trans = 0;		/* -m maximum data transferred */
-	uint64_t adjust_shift = 0;	/* -s ajustment scaling shift */
+	uint64_t adjust_shift = 3;	/* -s ajustment scaling shift */
 	uint64_t timed_run = 0;		/* -T timed tun duration */
 	off_t progress_size = 0;
 	int underrun_adjust = UNDERRUN_ADJUST_MAX;
@@ -581,6 +582,7 @@ int main(int argc, char **argv)
 			opt_flags |= OPT_URANDOM;
 			break;
 		case 's':
+			opt_flags |= OPT_GOT_SHIFT;
 			adjust_shift = get_uint64(optarg, &len);
 			break;
 		case 'S':
@@ -618,6 +620,10 @@ int main(int argc, char **argv)
 			exit(EXIT_FAILURE);
 		}
 	}
+
+	/* -i mode and no -s shift defined, default to non-adjust mode */
+	if ((opt_flags & OPT_GOT_IOSIZE) && !(opt_flags & OPT_GOT_SHIFT))
+		adjust_shift = 0;
 
 	if ((opt_flags & OPT_NO_RATE_CONTROL) &&
             (opt_flags & (OPT_GOT_CONST_DELAY | OPT_GOT_RATE | OPT_UNDERRUN | OPT_OVERRUN))) {
