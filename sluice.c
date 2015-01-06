@@ -41,44 +41,42 @@
 #define MB			(KB * KB)
 #define GB			(KB * KB * KB)
 
-#define UNDERRUN_MAX		(100)
-#define UNDERRUN_ADJUST_MAX	(2)
-#define OVERRUN_ADJUST_MAX	(2)
+#define UNDERRUN_MAX		(100)		/* Max underruns before warning, see -w */
+#define UNDERRUN_ADJUST_MAX	(2)		/* Underruns before adjusting rate */
+#define OVERRUN_ADJUST_MAX	(2)		/* Overruns before adjusting rate */
 
-#define DELAY_SHIFT_MIN		(0)
-#define DELAY_SHIFT_MAX		(16)
+#define DELAY_SHIFT_MIN		(0)		/* Min shift, see -s */
+#define DELAY_SHIFT_MAX		(16)		/* Max shift, see -s */
 
-#define IO_SIZE_MAX		(MB * 64)
-#define IO_SIZE_MIN		(1)
+#define IO_SIZE_MIN		(1)		/* Min io buffer size, see -i */
+#define IO_SIZE_MAX		(MB * 64)	/* Max io buffer size, see -i */
 
-#define DELAY_MIN		(0.01)
-#define DELAY_MAX		(10.00)
+#define DELAY_MIN		(0.01)		/* Min delay time, see -c */
+#define DELAY_MAX		(10.00)		/* Max delay time, see -c */
 
-#define DEFAULT_FREQ		(0.250)
+#define DRIFT_MAX		(7)		/* Number of drift stats, see -S */
+#define DEFAULT_FREQ		(0.250)		/* Default verbose feedback freq, see -f */
+#define DEBUG_RATE		(0)		/* Set to non-zero to get datarate debug */
 
-#define DEBUG_RATE		(0)
-
-#define OPT_VERBOSE		(0x00000001)
-#define OPT_GOT_RATE		(0x00000002)
-#define OPT_GOT_IOSIZE		(0x00000004)
-#define OPT_GOT_CONST_DELAY	(0x00000008)
-#define OPT_WARNING		(0x00000010)
-#define OPT_UNDERRUN		(0x00000020)
-#define OPT_DISCARD_STDOUT	(0x00000040)
-#define OPT_OVERRUN		(0x00000080)
-#define OPT_ZERO		(0x00000100)
-#define OPT_URANDOM		(0x00000200)
-#define OPT_APPEND		(0x00000400)
-#define OPT_STATS		(0x00000800)
-#define OPT_NO_RATE_CONTROL	(0x00001000)
-#define OPT_TIMED_RUN		(0x00002000)
-#define OPT_INPUT_FILE		(0x00004000)
-#define OPT_VERSION		(0x00008000)
-#define OPT_PROGRESS		(0x00010000)
-#define OPT_MAX_TRANS_SIZE	(0x00020000)
-#define OPT_SKIP_READ_ERRORS	(0x00040000)
-
-#define DRIFT_MAX		(7)
+#define OPT_VERBOSE		(0x00000001)	/* -v */
+#define OPT_GOT_RATE		(0x00000002)	/* -r */
+#define OPT_GOT_IOSIZE		(0x00000004)	/* -i */
+#define OPT_GOT_CONST_DELAY	(0x00000008)	/* -c */
+#define OPT_WARNING		(0x00000010)	/* -w */
+#define OPT_UNDERRUN		(0x00000020)	/* -u */
+#define OPT_DISCARD_STDOUT	(0x00000040)	/* -d */
+#define OPT_OVERRUN		(0x00000080)	/* -o */
+#define OPT_ZERO		(0x00000100)	/* -z */
+#define OPT_URANDOM		(0x00000200)	/* -R */
+#define OPT_APPEND		(0x00000400)	/* -a */
+#define OPT_STATS		(0x00000800)	/* -S */
+#define OPT_NO_RATE_CONTROL	(0x00001000)	/* -n */
+#define OPT_TIMED_RUN		(0x00002000)	/* -T */
+#define OPT_INPUT_FILE		(0x00004000)	/* -I */
+#define OPT_VERSION		(0x00008000)	/* -V */
+#define OPT_PROGRESS		(0x00010000)	/* -p */
+#define OPT_MAX_TRANS_SIZE	(0x00020000)	/* -m */
+#define OPT_SKIP_READ_ERRORS	(0x00040000)	/* -e */
 
 static unsigned int opt_flags;
 static const char *app_name = "sluice";
@@ -263,6 +261,7 @@ static void stats_info(const stats_t *stats)
 	fprintf(stderr, "Maximum rate:    %s/sec\n",
 		double_to_str(stats->rate_max));
 	if (!(opt_flags & OPT_NO_RATE_CONTROL)) {
+		/* The following only make sense if we have rate stats */
 		int i, last_percent = 0;
 		uint64_t drift_sum = 0;
 
@@ -287,6 +286,7 @@ static void stats_info(const stats_t *stats)
 	}
 
 	if (times(&t) != (clock_t)-1) {
+		/* CPU utilitation stats, if available */
 		long int ticks_per_sec;
 
 		if ((ticks_per_sec = sysconf(_SC_CLK_TCK)) > 0) {
@@ -307,9 +307,9 @@ static double timeval_to_double(void)
 	struct timeval tv;
 
 redo:
-	errno = 0;
+	errno = 0;			/* clear to be safe */
 	if (gettimeofday(&tv, NULL) < 0) {
-		if (errno == EINTR)	/* Should not occur */
+		if (errno == EINTR)	/* should not occur */
 			goto redo;
 
 		fprintf(stderr, "gettimeofday error: errno=%d (%s).\n",
@@ -476,22 +476,22 @@ int main(int argc, char **argv)
 	char *out_filename = NULL;	/* -t or -O option filename */
 	char *in_filename = NULL;	/* -I option filename */
 	int64_t delay, last_delay = 0;	/* Delays in 1/1000000 of a second */
-	uint64_t io_size = 0;
-	uint64_t data_rate = 0;
-	uint64_t total_bytes = 0;
-	uint64_t max_trans = 0;
+	uint64_t io_size = 0;		/* -i IO buffer size */
+	uint64_t data_rate = 0;		/* -r data rate */
+	uint64_t total_bytes = 0;	/* cumulative number of bytes read */
+	uint64_t max_trans = 0;		/* -m maximum data transferred */
+	uint64_t adjust_shift = 3;	/* -s ajustment scaling shift */
+	uint64_t timed_run = 0;		/* -T timed tun duration */
 	off_t progress_size = 0;
-	uint64_t adjust_shift = 3;
-	uint64_t timed_run = 0;
 	int underrun_adjust = UNDERRUN_ADJUST_MAX;
 	int overrun_adjust = OVERRUN_ADJUST_MAX;
 	int fdin = -1, fdout, fdtee = -1;
 	int underruns = 0, overruns = 0, warnings = 0;
 	int ret = EXIT_FAILURE;
 	double secs_start, secs_last, freq = DEFAULT_FREQ;
-	double const_delay = -1.0;
-	bool eof = false;
-	stats_t stats;
+	double const_delay = -1.0;	/* -c delay time between I/O */
+	bool eof = false;		/* EOF on input */
+	stats_t stats;			/* Data rate statistics */
 	struct sigaction new_action;
 
 	stats_init(&stats);
@@ -602,7 +602,6 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Cannot use -n option with -c, -r, -u or -o options.\n");
 		goto tidy;
 	}
-
 	if (!out_filename && (opt_flags & OPT_APPEND)) {
 		fprintf(stderr, "Must use -t filename when using the -a option.\n");
 		goto tidy;
@@ -624,7 +623,6 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Frequency too low.\n");
 		goto tidy;
 	}
-
 #if DELAY_SHIFT_MIN > 0
 	if (adjust_shift < DELAY_SHIFT_MIN || adjust_shift > DELAY_SHIFT_MAX) {
 #else
@@ -673,7 +671,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if ((io_size < 1) || (io_size > IO_SIZE_MAX)) {
+	if ((io_size < IO_SIZE_MIN) || (io_size > IO_SIZE_MAX)) {
 		fprintf(stderr, "I/O buffer size %" PRIu64 " out of range.\n",
 			io_size);
 		goto tidy;
@@ -729,6 +727,7 @@ int main(int argc, char **argv)
 		}
 	}
 
+	/* Default to stdin if not specified */
 	if (fdin == -1)
 		fdin = fileno(stdin);
 	fdout = fileno(stdout);
@@ -783,6 +782,14 @@ int main(int argc, char **argv)
 		goto tidy;
 	}
 
+	/*
+	 *  Main loop:
+	 * 	read data until buffer is full
+	 *	write data
+	 *	get new data rate
+	 *	adjust delay or buffer size 
+	 *	check for timeout
+	 */
 	while (!(eof | sluice_finish)) {
 		uint64_t current_rate, inbufsize = 0;
 		bool complete = false;
@@ -812,7 +819,9 @@ int main(int argc, char **argv)
 						/* read needs re-doing */
 						continue;
 					}
+					/* Ignore errors? */
 					if (opt_flags & OPT_SKIP_READ_ERRORS) {
+						/* Ensure block is empty */
 						memset(ptr, 0, sz);
 						n = sz;
 					} else {
@@ -841,6 +850,8 @@ int main(int argc, char **argv)
 				goto tidy;
 			}
 		}
+
+		/* -t Tee mode output */
 		if (fdtee >= 0) {
 redo_write:
 			if (write(fdtee, buffer, (size_t)inbufsize) < 0) {
@@ -884,6 +895,7 @@ redo_write:
 			goto tidy;
 		current_rate = (uint64_t)(((double)total_bytes) / (secs_now - secs_start));
 
+		/* Update min/max rate stats */
 		if (stats.rate_set) {
 			if (current_rate > stats.rate_max)
 				stats.rate_max = current_rate;
@@ -895,6 +907,7 @@ redo_write:
 			stats.rate_set = true;
 		}
 
+		/* Update drift stats only if we have rate controls enabled */
 		if (!(opt_flags & OPT_NO_RATE_CONTROL)) {
 			double drift_rate = 100.0 * fabs((double)current_rate - (double)data_rate) / data_rate;
 			int i;
@@ -913,9 +926,11 @@ redo_write:
 #endif
 
 		if (opt_flags & OPT_NO_RATE_CONTROL) {
+			/* No rate to compare to */
 			run = '-';
 		} else {
 			if (current_rate > (double)data_rate) {
+				/* Overrun */
 				run = '+' ;
 				if (!(opt_flags & OPT_GOT_CONST_DELAY)) {
 					if (adjust_shift)
@@ -932,6 +947,7 @@ redo_write:
 				overruns++;
 				stats.overruns++;
 			} else if (current_rate < (double)data_rate) {
+				/* Underrun */
 				run = '-' ;
 				if (!(opt_flags & OPT_GOT_CONST_DELAY)) {
 					if (adjust_shift)
@@ -948,24 +964,29 @@ redo_write:
 				stats.underruns++;
 				overruns = 0;
 			} else {
-				/* Unlikely.. */
+				/* Perfect, rather unlikely.. */
 				warnings = 0;
 				underruns = 0;
 				overruns = 0;
 				stats.perfect++;
 				run = '0';
 			}
+
+			/* Avoid the impossible */
 			if (delay < 0)
 				delay = 0;
 
 			if ((opt_flags & OPT_UNDERRUN) &&
 			    (underruns > underrun_adjust)) {
+				/* Adjust rate due to underruns */
 				char *tmp;
 				uint64_t tmp_io_size;
 
 				if (adjust_shift) {
+					/* Adjust by scaling io_size */
 					tmp_io_size = io_size + (io_size >> adjust_shift);
 				} else {
+					/* Adjust by comparing differences in rates */
 					uint64_t io_size_current = (KB * current_rate * const_delay) / KB;
 					uint64_t io_size_desired = (KB * data_rate * const_delay) / KB;
 					int64_t delta = llabs(io_size_desired - io_size_current);
@@ -991,12 +1012,15 @@ redo_write:
 
 			if ((opt_flags & OPT_OVERRUN) &&
 			    (overruns > overrun_adjust)) {
+				/* Adjust rate due to overruns */
 				char *tmp;
 				uint64_t tmp_io_size;
 
 				if (adjust_shift) {
+					/* Adjust by scaling io_size */
 					tmp_io_size = io_size - (io_size >> adjust_shift);
 				} else {
+					/* Adjust by comparing differences in rates */
 					uint64_t io_size_current = (KB * current_rate * const_delay) / KB;
 					uint64_t io_size_desired = (KB * data_rate * const_delay) / KB;
 					int64_t delta = llabs(io_size_desired - io_size_current);
@@ -1073,6 +1097,7 @@ redo_write:
 			secs_last = secs_now;
 		}
 
+		/* Timed run, if we timed out then stop */
 		if ((opt_flags & OPT_TIMED_RUN) &&
 		    ((secs_now - secs_start) > timed_run))
 			break;
