@@ -42,8 +42,8 @@
 #define GB			(KB * KB * KB)
 
 #define UNDERRUN_MAX		(100)		/* Max underruns before warning, see -w */
-#define UNDERRUN_ADJUST_MAX	(2)		/* Underruns before adjusting rate */
-#define OVERRUN_ADJUST_MAX	(2)		/* Overruns before adjusting rate */
+#define UNDERRUN_ADJUST_MAX	(1)		/* Underruns before adjusting rate */
+#define OVERRUN_ADJUST_MAX	(1)		/* Overruns before adjusting rate */
 
 #define DELAY_SHIFT_MIN		(0)		/* Min shift, see -s */
 #define DELAY_SHIFT_MAX		(16)		/* Max shift, see -s */
@@ -78,11 +78,6 @@
 #define OPT_MAX_TRANS_SIZE	(0x00020000)	/* -m */
 #define OPT_SKIP_READ_ERRORS	(0x00040000)	/* -e */
 
-static unsigned int opt_flags;
-static const char *app_name = "sluice";
-static const char *dev_urandom = "/dev/urandom";
-static volatile bool sluice_finish = false;
-
 /* scaling factor */
 typedef struct {
 	const char ch;			/* Scaling suffix */
@@ -107,6 +102,29 @@ typedef struct {
 	double		rate_max;	/* Maximum rate */
 	bool		rate_set;	/* Min/max set or not? */
 } stats_t;
+
+static unsigned int opt_flags;
+static const char *app_name = "sluice";
+static const char *dev_urandom = "/dev/urandom";
+static volatile bool sluice_finish = false;
+
+static const scale_t byte_scales[] = {
+	{ 'b',	1ULL },
+	{ 'k',  1ULL << 10 },	/* Kilobytes */
+	{ 'm',  1ULL << 20 },	/* Megabytes */
+	{ 'g',  1ULL << 30 },	/* Gigabytes */
+	{ 't',  1ULL << 40 },	/* Terabytes */
+	{ 'p',	1ULL << 60 },	/* Petabytes */
+	{ 0,    0 },
+};
+
+static const scale_t time_scales[] = {
+	{ 's',  1 },
+	{ 'm',  60 },
+	{ 'h',  3600 },
+	{ 'd',  24 * 3600 },
+	{ 'y',  365 * 24 * 3600 },
+};
 
 /*
  *  count_bits()
@@ -365,10 +383,10 @@ static double get_double(const char *const str, size_t *const len)
 
 
 /*
- *  get_uint64_scale()
+ *  get_double_scale()
  *	get a value and scale it by the given scale factor
  */
-static uint64_t get_uint64_scale(
+static double get_double_scale(
 	const char *const str,
 	const scale_t scales[],
 	const char *const msg)
@@ -388,16 +406,28 @@ static uint64_t get_uint64_scale(
 	}
 
 	if (isdigit(ch) || ch == '.')
-		return (uint64_t)val;
+		return val;
 
 	ch = tolower(ch);
 	for (i = 0; scales[i].ch; i++) {
 		if (ch == scales[i].ch)
-			return (uint64_t)(val * scales[i].scale);
+			return val * scales[i].scale;
 	}
 
 	printf("Illegal %s specifier %c\n", msg, str[len]);
 	exit(EXIT_FAILURE);
+}
+
+/*
+ *  get_uint64_scale()
+ *	get a value and scale it by the given scale factor
+ */
+static inline uint64_t get_uint64_scale(
+	const char *const str,
+	const scale_t scales[],
+	const char *const msg)
+{
+	return (uint64_t)get_double_scale(str, scales, msg);
 }
 
 /*
@@ -406,17 +436,16 @@ static uint64_t get_uint64_scale(
  */
 static uint64_t get_uint64_byte(const char *const str)
 {
-	static const scale_t scales[] = {
-		{ 'b', 	1ULL },
-		{ 'k',  1ULL << 10 },	/* Kilobytes */
-		{ 'm',  1ULL << 20 },	/* Megabytes */
-		{ 'g',  1ULL << 30 },	/* Gigabytes */
-		{ 't',  1ULL << 40 },	/* Terabytes */
-		{ 'p',	1ULL << 60 },	/* Petabytes */
-		{ 0,    0 },
-	};
+	return get_uint64_scale(str, byte_scales, "length");
+}
 
-	return get_uint64_scale(str, scales, "length");
+/*
+ *  get_double_byte()
+ *	size in bytes, K bytes, M bytes, G bytes, T bytes or P bytes
+ */
+static double get_double_byte(const char *const str)
+{
+	return get_double_scale(str, byte_scales, "length");
 }
 
 /*
@@ -425,15 +454,7 @@ static uint64_t get_uint64_byte(const char *const str)
  */
 uint64_t get_uint64_time(const char *const str)
 {
-	static const scale_t scales[] = {
-		{ 's',  1 },
-		{ 'm',  60 },
-		{ 'h',  3600 },
-		{ 'd',  24 * 3600 },
-		{ 'y',  365 * 24 * 3600 },
-	};
-
-	return get_uint64_scale(str, scales, "time");
+	return get_uint64_scale(str, time_scales, "time");
 }
 
 /*
@@ -475,12 +496,13 @@ int main(int argc, char **argv)
 	char *buffer = NULL;		/* Temp I/O buffer */
 	char *out_filename = NULL;	/* -t or -O option filename */
 	char *in_filename = NULL;	/* -I option filename */
-	int64_t delay, last_delay = 0;	/* Delays in 1/1000000 of a second */
+	double delay;
+	uint64_t last_delay = 0;	/* Delays in 1/1000000 of a second */
 	uint64_t io_size = 0;		/* -i IO buffer size */
-	uint64_t data_rate = 0;		/* -r data rate */
+	double data_rate = 0.0;		/* -r data rate */
 	uint64_t total_bytes = 0;	/* cumulative number of bytes read */
 	uint64_t max_trans = 0;		/* -m maximum data transferred */
-	uint64_t adjust_shift = 3;	/* -s ajustment scaling shift */
+	uint64_t adjust_shift = 0;	/* -s ajustment scaling shift */
 	uint64_t timed_run = 0;		/* -T timed tun duration */
 	off_t progress_size = 0;
 	int underrun_adjust = UNDERRUN_ADJUST_MAX;
@@ -552,7 +574,7 @@ int main(int argc, char **argv)
 			opt_flags |= (OPT_PROGRESS | OPT_VERBOSE);
 			break;
 		case 'r':
-			data_rate = get_uint64_byte(optarg);
+			data_rate = get_double_byte(optarg);
 			opt_flags |= OPT_GOT_RATE;
 			break;
 		case 'R':
@@ -615,8 +637,8 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Cannot use both -i and -c options together.\n");
 		goto tidy;
 	}
-	if ((opt_flags & OPT_GOT_RATE) && (data_rate < 1)) {
-		fprintf(stderr, "Rate value %" PRIu64 " too low.\n", data_rate);
+	if ((opt_flags & OPT_GOT_RATE) && (data_rate < 0.1)) {
+		fprintf(stderr, "Rate value %.1f too low.\n", data_rate);
 		goto tidy;
 	}
 	if (freq < 0.01) {
@@ -658,10 +680,10 @@ int main(int argc, char **argv)
 			if (opt_flags & OPT_NO_RATE_CONTROL) {
 				io_size = 4 * KB;
 			} else {
-				io_size = data_rate / 32;
+				io_size = (uint64_t)(data_rate / 32.0);
 				/* Make sure we don't have small sized I/O */
-				if (io_size < KB)
-					io_size = KB;
+				if (io_size < IO_SIZE_MIN)
+					io_size = IO_SIZE_MIN;
 				if (io_size > IO_SIZE_MAX) {
 					fprintf(stderr, "Rate too high, maximum allowed: %" PRIu64 ".\n",
 						(uint64_t)IO_SIZE_MAX * 32);
@@ -670,6 +692,9 @@ int main(int argc, char **argv)
 			}
 		}
 	}
+	if (opt_flags & OPT_MAX_TRANS_SIZE)
+		if (io_size > max_trans)
+			io_size = max_trans;
 
 	if ((io_size < IO_SIZE_MIN) || (io_size > IO_SIZE_MAX)) {
 		fprintf(stderr, "I/O buffer size %" PRIu64 " out of range.\n",
@@ -736,11 +761,11 @@ int main(int argc, char **argv)
 		goto tidy;
 
 	if (opt_flags & OPT_NO_RATE_CONTROL) {
-		delay = 0;
+		delay = 0.0;
 	} else if (opt_flags & OPT_GOT_CONST_DELAY) {
-		delay = 1000000 * const_delay;
+		delay = 1000000.0 * const_delay;
 	} else {
-		delay = (int)(((double)io_size * 1000000) / (double)data_rate);
+		delay = (double)io_size * 1000000.0 / (double)data_rate;
 	}
 	secs_last = secs_start;
 	stats.time_begin = secs_start;
@@ -784,16 +809,16 @@ int main(int argc, char **argv)
 
 	/*
 	 *  Main loop:
-	 * 	read data until buffer is full
+	 *	read data until buffer is full
 	 *	write data
 	 *	get new data rate
-	 *	adjust delay or buffer size 
+	 *	adjust delay or buffer size
 	 *	check for timeout
 	 */
 	while (!(eof | sluice_finish)) {
-		uint64_t current_rate, inbufsize = 0;
+		uint64_t inbufsize = 0;
 		bool complete = false;
-		double secs_now;
+		double current_rate, secs_now;
 
 		if (opt_flags & OPT_ZERO) {
 			inbufsize = io_size;
@@ -867,11 +892,11 @@ redo_write:
 				}
 			}
 		}
-		if (eof || (max_trans && total_bytes >= max_trans))
+		if (eof)
 			break;
 
 		if (delay > 0) {
-			if (usleep(delay) < 0) {
+			if (usleep((useconds_t)delay) < 0) {
 				if (errno == EINTR) {
 					if (sluice_finish)
 						goto finish;
@@ -893,7 +918,7 @@ redo_write:
 
 		if ((secs_now = timeval_to_double()) < 0.0)
 			goto tidy;
-		current_rate = (uint64_t)(((double)total_bytes) / (secs_now - secs_start));
+		current_rate = ((double)total_bytes) / (secs_now - secs_start);
 
 		/* Update min/max rate stats */
 		if (stats.rate_set) {
@@ -909,7 +934,7 @@ redo_write:
 
 		/* Update drift stats only if we have rate controls enabled */
 		if (!(opt_flags & OPT_NO_RATE_CONTROL)) {
-			double drift_rate = 100.0 * fabs((double)current_rate - (double)data_rate) / data_rate;
+			double drift_rate = 100.0 * fabs(current_rate - data_rate) / data_rate;
 			int i;
 
 			stats.drift_total++;
@@ -922,41 +947,41 @@ redo_write:
 			}
 		}
 #if DEBUG_RATE
-		fprintf(stderr, "%" PRIu64 "\n", current_rate);
+		fprintf(stderr, "%.2f\n", current_rate);
 #endif
 
 		if (opt_flags & OPT_NO_RATE_CONTROL) {
 			/* No rate to compare to */
 			run = '-';
 		} else {
-			if (current_rate > (double)data_rate) {
+			if (current_rate > data_rate) {
 				/* Overrun */
 				run = '+' ;
 				if (!(opt_flags & OPT_GOT_CONST_DELAY)) {
 					if (adjust_shift)
 						delay += ((last_delay >> adjust_shift) + 100);
 					else {
-						double d1 = (double)(total_bytes) / (double)current_rate;
-						double d2 = (double)(total_bytes + inbufsize) / (double)data_rate;
-
-						delay += 1000000.0 * fabs(d1 - d2);
+						double secs_desired = secs_start + ((total_bytes + inbufsize) / data_rate);
+						delay = 1000000.0 * (secs_desired - secs_now);
+						if (delay < 0)
+							delay = 0;
 					}
 				}
 				warnings = 0;
 				underruns = 0;
 				overruns++;
 				stats.overruns++;
-			} else if (current_rate < (double)data_rate) {
+			} else if (current_rate < data_rate) {
 				/* Underrun */
 				run = '-' ;
 				if (!(opt_flags & OPT_GOT_CONST_DELAY)) {
 					if (adjust_shift)
 						delay -= ((last_delay >> adjust_shift) + 100);
 					else {
-						double d1 = (double)(total_bytes) / (double)current_rate;
-						double d2 = (double)(total_bytes + inbufsize) / (double)data_rate;
-
-						delay -= 1000000.0 * fabs(d1 - d2);
+						double secs_desired = secs_start + ((total_bytes + inbufsize) / data_rate);
+						delay = 1000000.0 * (secs_desired - secs_now);
+						if (delay < 0)
+							delay = 0;
 					}
 				}
 				warnings++;
@@ -977,7 +1002,7 @@ redo_write:
 				delay = 0;
 
 			if ((opt_flags & OPT_UNDERRUN) &&
-			    (underruns > underrun_adjust)) {
+			    (underruns >= underrun_adjust)) {
 				/* Adjust rate due to underruns */
 				char *tmp;
 				uint64_t tmp_io_size;
@@ -1011,7 +1036,7 @@ redo_write:
 			}
 
 			if ((opt_flags & OPT_OVERRUN) &&
-			    (overruns > overrun_adjust)) {
+			    (overruns >= overrun_adjust)) {
 				/* Adjust rate due to overruns */
 				char *tmp;
 				uint64_t tmp_io_size;
@@ -1048,7 +1073,7 @@ redo_write:
 				opt_flags &= ~OPT_WARNING;
 			}
 		}
-		last_delay = delay;
+		last_delay = (uint64_t)delay;
 
 		/* Output feedback in verbose mode */
 		if ((opt_flags & OPT_VERBOSE) &&
@@ -1100,6 +1125,8 @@ redo_write:
 		/* Timed run, if we timed out then stop */
 		if ((opt_flags & OPT_TIMED_RUN) &&
 		    ((secs_now - secs_start) > timed_run))
+			break;
+		if (max_trans && total_bytes >= max_trans)
 			break;
 	}
 	ret = EXIT_SUCCESS;
