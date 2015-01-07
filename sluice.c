@@ -1081,7 +1081,7 @@ redo_write:
 			}
 		}
 #if DEBUG_RATE
-		fprintf(stderr, "rate: %.2f delay: %.2f io_size: %" PRIu64 "\n", current_rate, delay, io_size);
+		fprintf(stderr, "rate-pre : %.2f delay: %.2f io_size: %" PRIu64 "\n", current_rate, delay, io_size);
 #endif
 
 		if (opt_flags & OPT_NO_RATE_CONTROL) {
@@ -1146,11 +1146,7 @@ redo_write:
 					tmp_io_size = io_size + (io_size >> adjust_shift);
 				} else {
 					/* Adjust by comparing differences in rates */
-					uint64_t io_size_current = (KB * current_rate * const_delay) / KB;
-					uint64_t io_size_desired = (KB * data_rate * const_delay) / KB;
-					int64_t delta = llabs(io_size_desired - io_size_current);
-
-					tmp_io_size = io_size + delta;
+					tmp_io_size = io_size + (data_rate - current_rate) * const_delay;
 				}
 
 				/* If size is too small, we get stuck at 1 */
@@ -1180,11 +1176,7 @@ redo_write:
 					tmp_io_size = io_size - (io_size >> adjust_shift);
 				} else {
 					/* Adjust by comparing differences in rates */
-					uint64_t io_size_current = (KB * current_rate * const_delay) / KB;
-					uint64_t io_size_desired = (KB * data_rate * const_delay) / KB;
-					int64_t delta = llabs(io_size_desired - io_size_current);
-
-					tmp_io_size = io_size - delta;
+					tmp_io_size = io_size + (data_rate - current_rate) * const_delay;
 				}
 
 				if (tmp_io_size > IO_SIZE_MIN) {
@@ -1255,6 +1247,9 @@ redo_write:
 			(void)fflush(stderr);
 			secs_last = secs_now;
 		}
+#if DEBUG_RATE
+		fprintf(stderr, "rate-post: %.2f delay: %.2f io_size: %" PRIu64 "\n", current_rate, delay, io_size);
+#endif
 
 		/* Timed run, if we timed out then stop */
 		if ((opt_flags & OPT_TIMED_RUN) &&
