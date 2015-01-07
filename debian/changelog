@@ -1,3 +1,20 @@
+sluice (0.01.13-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Fix incorrectly escaped -s option
+  * Add caveat for the -r option in manual
+  * Allow for 100% overrun/underrun stats
+  * Add more precision to drift stats
+  * Add more meaningful time conversion with -p option
+  * Update manual with more explanations and clarifications.
+  * Re-write man page, better explanations of -i, -c and -s options
+  * Add debug and better user error messages
+  * -i mode and no -s shift defined, default to non-adjust mode
+  * Handle very slow input sizes and rates
+  * Don't use 4 as the minimum threshold
+
+ -- Colin King <colin.king@canonical.com>  Wed, 7 Jan 2015 11:18:18 +0000
+
 sluice (0.01.12-1) unstable; urgency=medium
 
   * Makefile: bump version again
