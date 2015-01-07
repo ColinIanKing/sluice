@@ -132,6 +132,16 @@ static const scale_t time_scales[] = {
 	{ 'y',  365 * 24 * 3600 },
 };
 
+static const scale_t second_scales[] = {
+	{ 'S',	1 },
+	{ 'M',	60 },
+	{ 'H',  3600 },
+	{ 'D',  24 * 3600 },
+	{ 'W',  7 * 24 * 3600 },
+	{ 'Y',  365 * 24 * 3600 },
+	{ ' ',  INT64_MAX },
+};
+
 /*
  *  count_bits()
  *      count bits set, from C Programming Language 2nd Ed
@@ -199,6 +209,23 @@ static inline void stats_init(stats_t *const stats)
 	stats->rate_min = 0.0;
 	stats->rate_max = 0.0;
 	stats->rate_set = false;
+}
+
+/*
+ *  secs_to_str()
+ *	report seconds in different units.
+ */
+static char *secs_to_str(const double secs)
+{
+	static char buf[64];
+	int i;
+
+	for (i = 0; i < 5; i++) {
+		if (secs <= second_scales[i + 1].scale)
+			break;
+	}
+	snprintf(buf, sizeof(buf), "%.2f %c", secs / second_scales[i].scale, second_scales[i].ch);
+	return buf;
 }
 
 /*
@@ -1121,9 +1148,9 @@ redo_write:
 					double secs_left = alpha - secs;
 
 					fprintf(stderr,"Rate: %s/S, "
-						"Total: %s, Dur: %.1f S, %5.1f%% ETA: %.1f S  \r",
+						"Total: %s, Dur: %.1f S, %5.1f%% ETA: %s  \r",
 						current_rate_str, total_bytes_str, secs,
-						percent, secs_left);
+						percent, secs_to_str(secs_left));
 				} else {
 					/* No size, avoid division by zero */
 					fprintf(stderr,"Rate: %s/S, "
