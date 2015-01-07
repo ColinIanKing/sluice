@@ -58,7 +58,8 @@
 
 #define FREQ_MIN		(0.01)		/* Min frequency, see -f */
 
-#define DRIFT_MAX		(7)		/* Number of drift stats, see -S */
+#define DRIFT_MAX		(11)		/* Number of drift stats, see -S */
+#define DRIFT_PERCENT_START	(0.0625)	/* Drift stats first point */
 #define DEFAULT_FREQ		(0.250)		/* Default verbose feedback freq, see -f */
 #define DEBUG_RATE		(0)		/* Set to non-zero to get datarate debug */
 #define DEBUG_SETUP		(0)		/* Set to non-zero to dump setup state */
@@ -313,20 +314,20 @@ static void stats_info(const stats_t *stats)
 		double_to_str(stats->rate_max));
 	if (!(opt_flags & OPT_NO_RATE_CONTROL)) {
 		/* The following only make sense if we have rate stats */
-		int i, last_percent = 0;
+		int i;
 		uint64_t drift_sum = 0;
+		double last_percent = 0.0, percent = DRIFT_PERCENT_START;
 
 		fprintf(stderr, "Drift from target rate: (%%)\n");
-		for (i = 0; i < DRIFT_MAX; i++) {
-			int percent = 1 << i;
-			fprintf(stderr, "  %5.2f%% - %5.2f%%: %6.2f%%\n",
-				(double)last_percent, (double)percent - 0.01,
+		for (i = 0; i < DRIFT_MAX; i++, percent *= 2.0) {
+			fprintf(stderr, "  %6.3f%% - %6.3f%%: %6.2f%%\n",
+				last_percent, percent - 0.0001,
 				stats->drift_total ?
 					100.0 * (double)stats->drift[i] / (double)stats->drift_total : 0.0);
 			last_percent = percent;
 			drift_sum += stats->drift[i];
 		}
-		fprintf(stderr, " >%5.2f%%         : %6.2f%%\n",
+		fprintf(stderr, " >%6.3f%%          : %6.2f%%\n",
 			(double)last_percent,
 			stats->drift_total ?
 				100.0 - ((100.0 * (double)drift_sum) / (double)stats->drift_total) : 0.0);
@@ -987,11 +988,11 @@ redo_write:
 		if (!(opt_flags & OPT_NO_RATE_CONTROL)) {
 			double drift_rate = 100.0 * fabs(current_rate - data_rate) / data_rate;
 			int i;
+			double percent = DRIFT_PERCENT_START;
 
 			stats.drift_total++;
-			for (i = 0; i < DRIFT_MAX; i++) {
-				int percent = 1 << i;
-				if (drift_rate < (double)percent) {
+			for (i = 0; i < DRIFT_MAX; i++, percent *= 2.0) {
+				if (drift_rate < percent) {
 					stats.drift[i]++;
 					break;
 				}
