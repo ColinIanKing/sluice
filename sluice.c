@@ -312,6 +312,7 @@ static void stats_info(const stats_t *stats)
 		double_to_str(stats->rate_min));
 	fprintf(stderr, "Maximum rate:    %s/sec\n",
 		double_to_str(stats->rate_max));
+
 	if (!(opt_flags & OPT_NO_RATE_CONTROL)) {
 		/* The following only make sense if we have rate stats */
 		int i;
@@ -331,12 +332,11 @@ static void stats_info(const stats_t *stats)
 			(double)last_percent,
 			stats->drift_total ?
 				100.0 - ((100.0 * (double)drift_sum) / (double)stats->drift_total) : 0.0);
-		fprintf(stderr, "Overruns:        %5.2f%%\n", total ?
+		fprintf(stderr, "Overruns:        %6.2f%%\n", total ?
 			100.0 * (double)stats->underruns / total : 0.0);
-		fprintf(stderr, "Underruns:       %5.2f%%\n", total ?
+		fprintf(stderr, "Underruns:       %6.2f%%\n", total ?
 			100.0 * (double)stats->overruns / total : 0.0);
 	}
-
 	if (times(&t) != (clock_t)-1) {
 		/* CPU utilitation stats, if available */
 		long int ticks_per_sec;
