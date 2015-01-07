@@ -44,6 +44,21 @@ size is adjusted by the previous size right shifted by the shift value.
 .B \-d
 discard data, do not copy it to stdout. This makes sluice act as a data sink.
 .TP
+.B \-D mode
+select delay mode.  The are various approaches to when to perform the data rate delays. The default is to perform the read, then write and finally the delay for each iteration. However, the \-D option allows one to select the delay mode as follows:
+.TS
+center;
+cB cB
+c l.
+Mode	Delay strategy
+0	Read, Write, Delay (default)
+1	Delay, Read, Write
+2	Read, Delay, Write
+3	Delay, Read, Delay, Write
+4	Read, Delay, Write, Delay
+5	Delay, Read, Delay, Write, Delay
+.TE
+.TP
 .B \-e
 ignore read errors. The failed read is replaced by zeros.
 .TP

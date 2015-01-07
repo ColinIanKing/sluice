@@ -85,6 +85,46 @@
 #define OPT_SKIP_READ_ERRORS	(0x00040000)	/* -e */
 #define OPT_GOT_SHIFT		(0x00080000)	/* -s */
 
+/* R = read, W = write, D = delay */
+#define DELAY_D_R_W		(0x00000000)	/* full delay */
+#define DELAY_R_W_D		(0x00000001)	/* full delay */
+#define DELAY_R_D_W		(0x00000002)	/* full delay */
+#define DELAY_D_R_D_W		(0x00000003)	/* 2 * 1/2 delay */
+#define DELAY_R_D_W_D		(0x00000004)	/* 2 * 1/2 delay */
+#define DELAY_D_R_D_W_D		(0x00000005)	/* 3 * 1/3 delay */
+
+#define DELAY_MODE_MIN		0
+#define DELAY_MODE_MAX		DELAY_D_R_D_W_D
+
+#define DELAY_D			(0x01)		/* delay */
+#define DELAY_S			(0x00)		/* skip */
+
+#define DELAY_SET_ACTION(a1, a2, a3)	((a1 << 0) | (a2 << 1) | (a3 << 2))
+#define DELAY_GET_ACTION(n, action)	((1 << n) & action)
+
+typedef struct {
+	uint8_t	mode;				/* User specified mode */
+	uint8_t	action;				/* action bit map */
+	double	divisor;			/* delay divisor */
+} delay_info_t;
+
+/*
+ *  action bit#
+ *	0		sleep on/off
+ *			read
+ *	1		sleep on/off
+ *			write
+ *	2		sleep on/off
+ */
+static delay_info_t delay_info[] = {
+	{ DELAY_R_W_D,	   DELAY_SET_ACTION(DELAY_S, DELAY_S, DELAY_D), 1.0 },
+	{ DELAY_D_R_W,	   DELAY_SET_ACTION(DELAY_D, DELAY_S, DELAY_S), 1.0 },
+	{ DELAY_R_D_W,     DELAY_SET_ACTION(DELAY_S, DELAY_D, DELAY_S), 1.0 },
+	{ DELAY_D_R_D_W,   DELAY_SET_ACTION(DELAY_D, DELAY_D, DELAY_S), 2.0 },
+	{ DELAY_R_D_W_D,   DELAY_SET_ACTION(DELAY_S, DELAY_D, DELAY_D), 2.0 },
+	{ DELAY_D_R_D_W_D, DELAY_SET_ACTION(DELAY_D, DELAY_D, DELAY_D), 3.0 },
+};
+
 /* scaling factor */
 typedef struct {
 	const char ch;			/* Scaling suffix */
@@ -502,6 +542,7 @@ static void show_usage(void)
 	printf("  -a        append to file (-t, -O options only).\n");
 	printf("  -c delay  specify constant delay time (seconds).\n");
 	printf("  -d        discard input (no output).\n");
+	printf("  -D        delay mode.\n");
 	printf("  -e        skip read errors.\n");
 	printf("  -f freq   frequency of -v statistics.\n");
 	printf("  -h        print this help.\n");
@@ -524,6 +565,52 @@ static void show_usage(void)
 	printf("  -z        ignore stdin, generate zeros.\n");
 }
 
+#define DELAY(delay)							\
+	if (delay > 0) {						\
+		if (usleep((useconds_t)delay) < 0) {			\
+			if (errno == EINTR) {				\
+				if (sluice_finish)			\
+					goto finish;			\
+				/*					\
+				 * usleep got interrupted, let		\
+				 * subsequent I/O cater with the	\
+				 * delay deltas rather than		\
+				 * trying to figure out how much	\
+				 * time was lost on early exit		\
+				 * from usleep				\
+				 */					\
+			} else {					\
+				fprintf(stderr, "usleep error: "	\
+					"errno=%d (%s).\n",		\
+					errno, strerror(errno));	\
+				goto tidy;				\
+			}						\
+		}							\
+	}
+
+#define DO_DELAY(delay, di, n)						\
+	if (DELAY_GET_ACTION(n, di->action))				\
+		DELAY(delay / di->divisor);
+
+static delay_info_t *get_delay_info(uint64_t delay_mode)
+{
+	int i;
+
+	if (delay_mode > DELAY_MODE_MAX) {
+		fprintf(stderr, "Delay mode -D %" PRIu64 " is too large, range 0..%u.\n",
+			delay_mode, DELAY_MODE_MAX);
+		return NULL;
+	}
+
+	for (i = 0; i <= DELAY_MODE_MAX; i++) {
+		if (delay_info[i].mode == delay_mode)
+			return &delay_info[i];
+	}
+	fprintf(stderr, "Cannot find delay mode %" PRIu64 ".\n",
+			delay_mode);
+	return NULL;
+}
+
 int main(int argc, char **argv)
 {
 	char run = ' ';			/* Overrun/underrun flag */
@@ -544,16 +631,18 @@ int main(int argc, char **argv)
 	int fdin = -1, fdout, fdtee = -1;
 	int underruns = 0, overruns = 0, warnings = 0;
 	int ret = EXIT_FAILURE;
+	uint64_t delay_mode = DELAY_D_R_W;
 	double secs_start, secs_last, freq = DEFAULT_FREQ;
 	double const_delay = -1.0;	/* -c delay time between I/O */
 	bool eof = false;		/* EOF on input */
 	stats_t stats;			/* Data rate statistics */
 	struct sigaction new_action;
+	delay_info_t *di = NULL;
 
 	stats_init(&stats);
 
 	for (;;) {
-		const int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:SnT:I:Vpe");
+		const int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:SnT:I:VpeD:");
 		size_t len;
 
 		if (c == -1)
@@ -569,6 +658,9 @@ int main(int argc, char **argv)
 			const_delay = atof(optarg);
 			underrun_adjust = 1;
 			overrun_adjust = 1;
+			break;
+		case 'D':
+			delay_mode = get_uint64(optarg, &len);
 			break;
 		case 'd':
 			opt_flags |= OPT_DISCARD_STDOUT;
@@ -654,6 +746,8 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if ((di = get_delay_info(delay_mode)) == NULL)
+		goto tidy;
 	if ((opt_flags & OPT_NO_RATE_CONTROL) &&
             (opt_flags & (OPT_GOT_CONST_DELAY | OPT_GOT_RATE | OPT_UNDERRUN | OPT_OVERRUN))) {
 		fprintf(stderr, "Cannot use -n option with -c, -r, -u or -o options.\n");
@@ -872,12 +966,15 @@ int main(int argc, char **argv)
 		bool complete = false;
 		double current_rate, secs_now;
 
+		DO_DELAY(delay, di, 0);
+
 		if (opt_flags & OPT_ZERO) {
 			inbufsize = io_size;
 			total_bytes += io_size;
 			stats.reads++;
 		} else {
 			char *ptr = buffer;
+
 			while (!complete && (inbufsize < io_size)) {
 				uint64_t sz = io_size - inbufsize;
 				ssize_t n;
@@ -887,6 +984,7 @@ int main(int argc, char **argv)
 					sz = max_trans - total_bytes;
 					complete = true;
 				}
+
 
 				n = read(fdin, ptr, (ssize_t)sz);
 				if (n < 0) {
@@ -917,6 +1015,9 @@ int main(int argc, char **argv)
 				stats.reads++;
 			}
 		}
+
+		DO_DELAY(delay, di, 1);
+
 		stats.writes++;
 		stats.total_bytes += inbufsize;
 		stats.buf_size_total += inbufsize;
@@ -947,26 +1048,7 @@ redo_write:
 		if (eof)
 			break;
 
-		if (delay > 0) {
-			if (usleep((useconds_t)delay) < 0) {
-				if (errno == EINTR) {
-					if (sluice_finish)
-						goto finish;
-					/*
-					 * usleep got interrupted, let
-					 * subsequent I/O cater with the
-					 * delay deltas rather than
-					 * trying to figure out how much
-					 * time was lost on early exit
-					 * from usleep
-					 */
-				} else {
-					fprintf(stderr, "usleep error: errno=%d (%s).\n",
-						errno, strerror(errno));
-					goto tidy;
-				}
-			}
-		}
+		DO_DELAY(delay, di, 2);
 
 		if ((secs_now = timeval_to_double()) < 0.0)
 			goto tidy;
