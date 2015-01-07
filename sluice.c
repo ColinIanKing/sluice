@@ -54,9 +54,14 @@
 #define DELAY_MIN		(0.01)		/* Min delay time, see -c */
 #define DELAY_MAX		(10.00)		/* Max delay time, see -c */
 
+#define DATA_RATE_MIN		(0.1)		/* Min data rate, see -r */
+
+#define FREQ_MIN		(0.01)		/* Min frequency, see -f */
+
 #define DRIFT_MAX		(7)		/* Number of drift stats, see -S */
 #define DEFAULT_FREQ		(0.250)		/* Default verbose feedback freq, see -f */
 #define DEBUG_RATE		(0)		/* Set to non-zero to get datarate debug */
+#define DEBUG_SETUP		(0)		/* Set to non-zero to dump setup state */
 
 #define OPT_VERBOSE		(0x00000001)	/* -v */
 #define OPT_GOT_RATE		(0x00000002)	/* -r */
@@ -503,8 +508,8 @@ int main(int argc, char **argv)
 	double data_rate = 0.0;		/* -r data rate */
 	uint64_t total_bytes = 0;	/* cumulative number of bytes read */
 	uint64_t max_trans = 0;		/* -m maximum data transferred */
-	uint64_t adjust_shift = 3;	/* -s ajustment scaling shift */
-	uint64_t timed_run = 0;		/* -T timed tun duration */
+	uint64_t adjust_shift = 0;	/* -s adjustment scaling shift */
+	uint64_t timed_run = 0;		/* -T timed run duration */
 	off_t progress_size = 0;
 	int underrun_adjust = UNDERRUN_ADJUST_MAX;
 	int overrun_adjust = OVERRUN_ADJUST_MAX;
@@ -621,10 +626,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-	/* -i mode and no -s shift defined, default to non-adjust mode */
-	if ((opt_flags & OPT_GOT_IOSIZE) && !(opt_flags & OPT_GOT_SHIFT))
-		adjust_shift = 0;
-
 	if ((opt_flags & OPT_NO_RATE_CONTROL) &&
             (opt_flags & (OPT_GOT_CONST_DELAY | OPT_GOT_RATE | OPT_UNDERRUN | OPT_OVERRUN))) {
 		fprintf(stderr, "Cannot use -n option with -c, -r, -u or -o options.\n");
@@ -643,12 +644,14 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Cannot use both -i and -c options together.\n");
 		goto tidy;
 	}
-	if ((opt_flags & OPT_GOT_RATE) && (data_rate < 0.1)) {
-		fprintf(stderr, "Rate value %.1f too low.\n", data_rate);
+	if ((opt_flags & OPT_GOT_RATE) && (data_rate < DATA_RATE_MIN)) {
+		fprintf(stderr, "Rate value %.2f too low. Minimum allowed is %.2f bytes/sec.\n",
+			data_rate, DATA_RATE_MIN);
 		goto tidy;
 	}
-	if (freq < 0.01) {
-		fprintf(stderr, "Frequency too low.\n");
+	if (freq < FREQ_MIN) {
+		fprintf(stderr, "Frequency %.3f too low. Minimum allowed is %.3f Hz.\n",
+			freq, FREQ_MIN);
 		goto tidy;
 	}
 #if DELAY_SHIFT_MIN > 0
@@ -686,13 +689,18 @@ int main(int argc, char **argv)
 			if (opt_flags & OPT_NO_RATE_CONTROL) {
 				io_size = 4 * KB;
 			} else {
+				/*
+				 * User has not specified -i or -c, so define the io_size
+				 * base on 1/32 of the data rate, e.g. ~32 writes per second
+				 */
 				io_size = (uint64_t)(data_rate / 32.0);
 				/* Make sure we don't have small sized I/O */
 				if (io_size < IO_SIZE_MIN)
 					io_size = IO_SIZE_MIN;
 				if (io_size > IO_SIZE_MAX) {
-					fprintf(stderr, "Rate too high, maximum allowed: %" PRIu64 ".\n",
-						(uint64_t)IO_SIZE_MAX * 32);
+					fprintf(stderr, "Rate too high, maximum allowed: %s/sec.\n",
+						double_to_str((double)IO_SIZE_MAX * 32.0));
+					fprintf(stderr, "Use -i to explictly set buffer size.\n");
 					goto tidy;
 				}
 			}
@@ -703,8 +711,8 @@ int main(int argc, char **argv)
 			io_size = max_trans;
 
 	if ((io_size < IO_SIZE_MIN) || (io_size > IO_SIZE_MAX)) {
-		fprintf(stderr, "I/O buffer size %" PRIu64 " out of range.\n",
-			io_size);
+		fprintf(stderr, "I/O buffer size too large, maximum allowed: %s.\n",
+			double_to_str((double)IO_SIZE_MAX));
 		goto tidy;
 	}
 	if ((buffer = malloc(io_size)) == NULL) {
@@ -773,6 +781,16 @@ int main(int argc, char **argv)
 	} else {
 		delay = (double)io_size * 1000000.0 / (double)data_rate;
 	}
+
+#if DEBUG_SETUP
+	fprintf(stderr, "io_size:         %" PRIu64 "\n", io_size);
+	fprintf(stderr, "data_rate:       %f\n", data_rate);
+	fprintf(stderr, "const_delay:     %f\n", const_delay);
+	fprintf(stderr, "delay:           %f\n", delay);
+	fprintf(stderr, "progress_size:   %" PRIu64 "\n", (uint64_t)progress_size);
+	fprintf(stderr, "max_trans:       %" PRIu64 "\n", max_trans);
+	fprintf(stderr, "shift:           %" PRIu64 "\n", adjust_shift);
+#endif
 	secs_last = secs_start;
 	stats.time_begin = secs_start;
 	stats.target_rate = data_rate;
@@ -953,7 +971,7 @@ redo_write:
 			}
 		}
 #if DEBUG_RATE
-		fprintf(stderr, "%.2f\n", current_rate);
+		fprintf(stderr, "rate: %.2f delay: %.2f io_size: %" PRIu64 "\n", current_rate, delay, io_size);
 #endif
 
 		if (opt_flags & OPT_NO_RATE_CONTROL) {
