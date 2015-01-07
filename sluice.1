@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH SLUICE 1 "January 4, 2015"
+.TH SLUICE 1 "January 7, 2015"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -26,21 +26,25 @@ sluice \- a tool to control data flow at a specified rate
 
 .SH DESCRIPTION
 sluice is a program that reads input from stdin and outputs to stdout at
-a specified data rate.
+a specified data rate. It has various data rate controlling mechanisms that
+can be tuned for specific use cases where necessary.
 
 .SH OPTIONS
 sluice options are as follow:
 .TP
 .B \-a
-append to file (used in conjunction with the \-t 'tee' or \-O options). Instead of creating a new file
-or truncating an existing file, this option appends data to the file.
+append output to a file (used in conjunction with the \-t 'tee' or \-O options). Instead of creating a new file or truncating an existing file, this option appends data to the file.
 .TP
 .B \-c delay
-define constant delay time (in seconds) between writes. This option enables a constant
-time between writes and adjusts the buffer size to try and keep the data rate
-constant.  This option is mutually exclusive to the \-i option.  This implicitly
-enables the \-o (overrun) and \-u (underrun) buffer management options to
-keep the data rate constant.
+enables a constant delay time (in seconds) between writes. This option adjusts the output buffer size to try and keep the data rate constant.  The output buffer size in this mode is initially set to the data rate \(mu the delay. 
+.br
+
+This option is mutually exclusive to the \-i option and implicitly
+enables the \-o overrun and \-u underrun buffer management options to dynamically re-size
+the read/write buffer to keep the data rate constant.  By default, this adjusts the
+buffer based on the total amount of data transferred and the time to write this (equivalent to
+the -\s 0 turning mode).  However, if the \-s shift value is greater than 0, then the new
+size is adjusted by the previous size right shifted by the shift value.
 .TP
 .B \-d
 discard data, do not copy it to stdout. This makes sluice act as a data sink.
@@ -55,26 +59,38 @@ specify the frequency of \-v verbose statistics updates. The default is 1/4 of a
 show help
 .TP
 .B \-i size
-specify the read/write size, the default size is in bytes, but the K, M, G, T and P suffixes
-can specify size in Kilobytes, Megabytes, Gigabytes, Terabytes and Petabytes respectively. By specifying
-a fixed buffer size means that this option is mutually exclusive to the \-c
-option.
+specify the read/write size in bytes. The K, M, G, T and P suffixes allow one to 
+specify size in Kilobytes, Megabytes, Gigabytes, Terabytes and Petabytes respectively.
+This option is mutually exclusive to the \-c option.
+.br
+
+In this mode, the delays between writes are used to control the data rate. By default,
+the delay is based on the total amount of data transferred and the time taken to write this.
+This is equivalent to the \-s 0 tuning mode.   However, if the \-s shift value is greater than
+0, then the new delay is adjusted by the previous delay right shifted by the shift value.
+.br
+
+A special hybrid rate control mode can be invoked by also using the \-o overflow and \-u underflow
+options also enable dynamic re-sizing of the read/write buffer.  By default, this adjusts the
+buffer based on the total amount of data transferred and the time to write this (equivalent to
+the -\s 0 turning mode).  However, if the \-s shift value is greater than 0, then the new
+size is adjusted by the previous size right shifted by the shift value.
 .TP
 .B \-I file
 read input from file rather than from stdin.
 .TP
 .B \-m size
 specify amount of data to process, the default size is in bytes, but the K, M, G and T suffixes
-can specify size in Kilobytes, Megabytes, Gigabytes and Terabytes respectively.
+can specify size in Kilobytes, Megabytes, Gigabytes and Terabytes respectively. If this size is
+less than the write size, then the write size is truncated to be the \-m size.
 .TP
 .B \-n
-no rate control. This is just a straight data copy much like cat. Combined with the \-v and \-S
-options one can observe the data rates of the copy.
+no rate control. This is just a straight data copy much like cat and all data rate controls
+cannot be used. Combined with the \-v and \-S options one can observe the data rates of the copy.
 .TP
 .B \-o
 detect overrun and re-size read/write buffer size to try and stop overrun. This will
-shrink the buffer each time 10 consecutive overruns are detected. The buffer will not
-be shrunk any less than 1 byte in size.
+shrink the buffer each time consecutive overruns are detected.
 .TP
 .B \-O file
 send output to file, equivalent to \-dt file
@@ -85,20 +101,25 @@ option and the file size is non-zero.
 .TP
 .B \-r rate
 specify the data rate in bytes per second. The K, M, G and T suffixes
-can specify the rate in Kilobytes/sec, Megabytes/sec, Gigabytes/sec and Terabytes/sec respectively.
+can specify the rate in Kilobytes/sec, Megabytes/sec, Gigabytes/sec and Terabytes/sec respectively. This option must always be provided.
 .TP
 .B \-R
 don't read from stdin, instead generate a stream of random data from /dev/urandom.
 .TP
 .B \-s shift
-modify the rate adjustment shift. For the \-r option, the delay between each write is
-controlled by modifying the previous delay by adding or subtracting the previous delay
-right shifted by the shift value.  The larger the shift value the longer it takes to adjust up/down to the
-specified rate.  The smaller the shift value the quicker it takes to reach the optimal delay, however, this can
-result in a highly fluctuating rate because the delay varies by a large amount causing
-over overshoot and undershoot.  The default value is 2 and works well for most rates.
+modify the rate adjustment shift. This is a data rate tuning scaling factor used by the \-r and \-c options.
 .br
-For the \-c, \-o and \-u options, the size of the buffer is modified by adding or subtracting the previous size shifted by the shift value.
+
+For the \-r option, the delay between each write is controlled by modifying the previous delay by adding or subtracting the previous delay right shifted by this shift value.  The larger the shift value the longer it takes to adjust up/down to the specified rate.  The smaller the shift value the quicker it takes to reach the optimal delay, however, this can result in a highly fluctuating rate because the delay varies by a large amount causing over overshoot and undershoot.  A shift value of 3 works well for most fast rates.
+.br
+
+For the \-c, \-o and \-u options, the size of the buffer is modified by adding or subtracting the previous size shifted by the shift value. Again, a shift value of 3 works well for most fast rates.
+.br
+
+If the shift value is set to 0, then the shift rate adjustment tuning mechanism is explicitly turned off and data rates are adjusted based on the total amount of data transferred and the time to write this.
+.br
+
+Small \-s shift values of 1 and 2 can cause rapid oscillations before data rate damping fully kicks into action. The default value of \-s 0 is recommended for accurate low-speed data transfers.
 .TP
 .B \-S
 print various performance and buffering statistics to stderr when end of file is reached.
@@ -112,7 +133,7 @@ the suffix s, m, h, d or y.
 .TP
 .B \-u
 detect underrun and re-size read/write buffer size to try and stop underrun. This will
-expand the buffer each time 10 consecutive underruns are detected. The buffer will not
+expand the buffer each time consecutive underruns are detected. The buffer will not
 be expanded any more than 4MB in size.
 .TP
 .B \-v
@@ -122,8 +143,7 @@ write verbose statistics to stderr.
 print version information to standard out and exit successfully.
 .TP
 .B \-w
-warn if a long burst of continuous data rate underrun occurs, the warning is issued just once.  To overcome the underrun increase the \-i read/write buffer size or use the \-u option to auto-expand the read/write buffer.  Too many underruns implies
-that too small a buffer or not enough CPU is available to keep up with the required data rate.
+warn if a long burst of continuous data rate underrun occurs, the warning is issued just once.  To overcome the underrun increase the \-i read/write buffer size or use the \-u option to auto-expand the read/write buffer.  Too many underruns implies that too small a buffer or not enough CPU is available to keep up with the required data rate.
 .TP
 .B \-z
 don't read from stdin, instead generate a stream of zeros.
@@ -131,9 +151,13 @@ don't read from stdin, instead generate a stream of zeros.
 .B SIGUSR1 SIGINFO
 Sending SIGUSR1 (or SIGINFO on BSD systems) will toggle the verbose data rate mode on/off.
 .TP
-.TP
 .B SIGUSR2
 Toggle underrun/overrun (-u, -o) options on/off.
+.SH NOTES
+If neither \-i or \-c options are used, then sluice defaults to using a write buffer
+size of 1/32 of the data rate and bounded between the limits of 1 byte and 64MB. Sluice
+will try to keep the data rate steady by adjusting the delay between writes. To tune this,
+see the \-s option.
 .SH EXAMPLES
 .LP
 Read /dev/zero and write in 4K sizes at the rate of 1MB/sec to the file example.dat
@@ -141,9 +165,9 @@ Read /dev/zero and write in 4K sizes at the rate of 1MB/sec to the file example.
 cat /dev/zero | sluice \-i 4K \-r 1M > example.dat
 .RE
 .LP
-Read 32MB from /dev/zero and write at the rate of 64K/sec to stdout with feedback on stderr
+Read 32MB from /dev/zero and write at the rate of 64K/sec to stdout with feedback on duration and ETA on stderr using 4K buffer writes and a tuning shift of 4.
 .RS 8
-cat /dev/zero | sluice \-r 64K \-v \-m 32M
+cat /dev/zero | sluice \-r 64K \-vp \-m 32M \-i 4K \-s 4
 .RE
 .LP
 Generate a stream of zeros and write at a rate of 1MB/sec to a fifo with underrun and overrun buffer management
@@ -156,9 +180,9 @@ Write random data at 5MB per second to file myfile doing a write every 0.1 secon
 sluice \-R \-r 5M \-c 0.1 > myfile
 .RE
 .LP
-Write zeros to the drive in 64K chunks and measure write rate as a crude throughput test
+Write zeros to the file example-file in 64K chunks and measure write rate as a crude throughput test
 .RS 8
-sluice \-nzSv \-f 0.1 \-i 64K > test
+sluice \-nzSv \-f 0.1 \-i 64K > example-file
 .RE
 .SH BUGS
 Stopping and starting sluice using SIGSTOP and SIGCONT will interfere with the internal buffering
