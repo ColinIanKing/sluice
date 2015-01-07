@@ -60,7 +60,7 @@ specify the read/write size in bytes. The K, M, G, T and P suffixes allow one to
 In this mode, the delays between writes are used to control the data rate. By default the delay is based on the total amount of data transferred and the time taken to write this.  This is equivalent to the \-s 0 tuning mode.   However, if the \-s shift value is greater than 0, then the new delay is adjusted by the previous delay right shifted by the shift value.
 .br
 
-A special hybrid rate control mode can be invoked by also using the \-o overflow and \-u underflow options to also enable dynamic re-sizing of the read/write buffer.  By default this adjusts the buffer based on the total amount of data transferred and the time to write this (equivalent to the -\s 0 turning mode).  However, if the \-s shift value is greater than 0, then the new size is adjusted by the previous size right shifted by the shift value.
+A special hybrid rate control mode can be invoked by also using the \-o overflow and \-u underflow options to also enable dynamic re-sizing of the read/write buffer.  By default this adjusts the buffer based on the total amount of data transferred and the time to write this (equivalent to the \-s 0 turning mode).  However, if the \-s shift value is greater than 0, then the new size is adjusted by the previous size right shifted by the shift value.
 .TP
 .B \-I file
 read input from file rather than from stdin.
