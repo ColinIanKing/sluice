@@ -1,3 +1,10 @@
+sluice (0.01.16-1) unstable; urgency=medium
+
+  * Bump version once more
+  * Correct the default delay mode to be really -D0
+
+ -- Colin King <colin.king@canonical.com>  Thu, 8 Jan 2015 19:23:00 +0000
+
 sluice (0.01.15-1) unstable; urgency=medium
 
   * Makefile: bump version
