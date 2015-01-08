@@ -1099,6 +1099,8 @@ int main(int argc, char **argv)
 				stats.reads++;
 			}
 		}
+		if (eof)
+			break;
 
 		DO_DELAY(delay, di, 1, stats);
 
