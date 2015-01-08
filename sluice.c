@@ -61,6 +61,7 @@
 #define DRIFT_MAX		(11)		/* Number of drift stats, see -S */
 #define DRIFT_PERCENT_START	(0.0625)	/* Drift stats first point */
 #define DEFAULT_FREQ		(0.250)		/* Default verbose feedback freq, see -f */
+
 #define DEBUG_RATE		(0)		/* Set to non-zero to get datarate debug */
 #define DEBUG_SETUP		(0)		/* Set to non-zero to dump setup state */
 
@@ -84,6 +85,8 @@
 #define OPT_MAX_TRANS_SIZE	(0x00020000)	/* -m */
 #define OPT_SKIP_READ_ERRORS	(0x00040000)	/* -e */
 #define OPT_GOT_SHIFT		(0x00080000)	/* -s */
+
+#define BUF_SIZE(sz)		((((size_t)sz) < 1) ? 1 : ((size_t)sz))
 
 /* R = read, W = write, D = delay */
 #define DELAY_D_R_W		(0x00000000)	/* full delay */
@@ -619,7 +622,7 @@ int main(int argc, char **argv)
 	char *in_filename = NULL;	/* -I option filename */
 	double delay;
 	uint64_t last_delay = 0;	/* Delays in 1/1000000 of a second */
-	uint64_t io_size = 0;		/* -i IO buffer size */
+	double io_size = 0.9;		/* -i IO buffer size */
 	double data_rate = 0.0;		/* -r data rate */
 	uint64_t total_bytes = 0;	/* cumulative number of bytes read */
 	uint64_t max_trans = 0;		/* -m maximum data transferred */
@@ -676,7 +679,7 @@ int main(int argc, char **argv)
 			exit(EXIT_SUCCESS);
 		case 'i':
 			opt_flags |= OPT_GOT_IOSIZE;
-			io_size = get_uint64_byte(optarg);
+			io_size = (double)get_uint64_byte(optarg);
 			break;
 		case 'I':
 			opt_flags |= OPT_INPUT_FILE;
@@ -797,8 +800,8 @@ int main(int argc, char **argv)
 	 */
 	if (!(opt_flags & OPT_GOT_IOSIZE)) {
 		if (opt_flags & OPT_GOT_CONST_DELAY) {
-			io_size = (KB * data_rate * const_delay) / KB;
-			if (io_size < 1) {
+			io_size = data_rate * const_delay;
+			if (io_size < IO_SIZE_MIN) {
 				fprintf(stderr, "Delay too small, internal buffer too small.\n");
 				goto tidy;
 			}
@@ -815,7 +818,7 @@ int main(int argc, char **argv)
 				 * User has not specified -i or -c, so define the io_size
 				 * base on 1/32 of the data rate, e.g. ~32 writes per second
 				 */
-				io_size = (uint64_t)(data_rate / 32.0);
+				io_size = data_rate / 32.0;
 				/* Make sure we don't have small sized I/O */
 				if (io_size < IO_SIZE_MIN)
 					io_size = IO_SIZE_MIN;
@@ -830,20 +833,19 @@ int main(int argc, char **argv)
 	}
 	if (opt_flags & OPT_MAX_TRANS_SIZE)
 		if (io_size > max_trans)
-			io_size = max_trans;
+			io_size = (double)max_trans;
 
 	if ((io_size < IO_SIZE_MIN) || (io_size > IO_SIZE_MAX)) {
 		fprintf(stderr, "I/O buffer size too large, maximum allowed: %s.\n",
 			double_to_str((double)IO_SIZE_MAX));
 		goto tidy;
 	}
-	if ((buffer = malloc(io_size)) == NULL) {
-		fprintf(stderr,"Cannot allocate buffer of %" PRIu64 " bytes.\n",
-			io_size);
+	if ((buffer = malloc(BUF_SIZE(io_size))) == NULL) {
+		fprintf(stderr,"Cannot allocate buffer of %.0f bytes.\n", io_size);
 		goto tidy;
 	}
 	if (opt_flags & OPT_ZERO)
-		memset(buffer, 0, io_size);
+		memset(buffer, 0, (size_t)io_size);
 
 	if (count_bits(opt_flags & (OPT_ZERO | OPT_URANDOM | OPT_INPUT_FILE)) > 1) {
 		fprintf(stderr, "Cannot use -z, -R or -I options together.\n");
@@ -901,11 +903,11 @@ int main(int argc, char **argv)
 	} else if (opt_flags & OPT_GOT_CONST_DELAY) {
 		delay = 1000000.0 * const_delay;
 	} else {
-		delay = (double)io_size * 1000000.0 / (double)data_rate;
+		delay = io_size * 1000000.0 / (double)data_rate;
 	}
 
 #if DEBUG_SETUP
-	fprintf(stderr, "io_size:         %" PRIu64 "\n", io_size);
+	fprintf(stderr, "io_size:         %.0f\n", io_size);
 	fprintf(stderr, "data_rate:       %f\n", data_rate);
 	fprintf(stderr, "const_delay:     %f\n", const_delay);
 	fprintf(stderr, "delay:           %f\n", delay);
@@ -969,14 +971,14 @@ int main(int argc, char **argv)
 		DO_DELAY(delay, di, 0);
 
 		if (opt_flags & OPT_ZERO) {
-			inbufsize = io_size;
-			total_bytes += io_size;
+			inbufsize = (uint64_t)io_size;
+			total_bytes += (uint64_t)io_size;
 			stats.reads++;
 		} else {
 			char *ptr = buffer;
 
-			while (!complete && (inbufsize < io_size)) {
-				uint64_t sz = io_size - inbufsize;
+			while (!complete && (inbufsize < (uint64_t)io_size)) {
+				uint64_t sz = (uint64_t)io_size - inbufsize;
 				ssize_t n;
 
 				/* We hit the user specified max limit to transfer */
@@ -1081,7 +1083,7 @@ redo_write:
 			}
 		}
 #if DEBUG_RATE
-		fprintf(stderr, "rate-pre : %.2f delay: %.2f io_size: %" PRIu64 "\n", current_rate, delay, io_size);
+		fprintf(stderr, "rate-pre : %.2f delay: %.2f io_size: %.3f\n", current_rate, delay, io_size);
 #endif
 
 		if (opt_flags & OPT_NO_RATE_CONTROL) {
@@ -1139,22 +1141,21 @@ redo_write:
 			    (underruns >= underrun_adjust)) {
 				/* Adjust rate due to underruns */
 				char *tmp;
-				uint64_t tmp_io_size;
+				double tmp_io_size;
 
 				if (adjust_shift) {
 					/* Adjust by scaling io_size */
-					tmp_io_size = io_size + (io_size >> adjust_shift);
+					tmp_io_size = io_size + (io_size / (1 << adjust_shift));
+					/* If size is too small, we get stuck at 1 */
+					if (tmp_io_size < 1)
+						tmp_io_size = 1;
 				} else {
 					/* Adjust by comparing differences in rates */
 					tmp_io_size = io_size + (data_rate - current_rate) * const_delay;
 				}
 
-				/* If size is too small, we get stuck at 1 */
-				if (tmp_io_size < 1)
-					tmp_io_size = 1;
-
 				if (tmp_io_size < IO_SIZE_MAX) {
-					tmp = realloc(buffer, tmp_io_size);
+					tmp = realloc(buffer, BUF_SIZE(tmp_io_size));
 					if (tmp) {
 						if (opt_flags & OPT_ZERO)
 							memset(tmp, 0, tmp_io_size);
@@ -1169,18 +1170,21 @@ redo_write:
 			    (overruns >= overrun_adjust)) {
 				/* Adjust rate due to overruns */
 				char *tmp;
-				uint64_t tmp_io_size;
+				double tmp_io_size;
 
 				if (adjust_shift) {
 					/* Adjust by scaling io_size */
-					tmp_io_size = io_size - (io_size >> adjust_shift);
+					tmp_io_size = io_size - (io_size / (1 << adjust_shift));
+					/* If size is too small, we get stuck at 1 */
+					if (tmp_io_size < 1)
+						tmp_io_size = 1;
 				} else {
 					/* Adjust by comparing differences in rates */
 					tmp_io_size = io_size + (data_rate - current_rate) * const_delay;
 				}
 
 				if (tmp_io_size > IO_SIZE_MIN) {
-					tmp = realloc(buffer, tmp_io_size);
+					tmp = realloc(buffer, BUF_SIZE(tmp_io_size));
 					if (tmp) {
 						if (opt_flags & OPT_ZERO)
 							memset(tmp, 0, tmp_io_size);
@@ -1248,7 +1252,7 @@ redo_write:
 			secs_last = secs_now;
 		}
 #if DEBUG_RATE
-		fprintf(stderr, "rate-post: %.2f delay: %.2f io_size: %" PRIu64 "\n", current_rate, delay, io_size);
+		fprintf(stderr, "rate-post: %.2f delay: %.2f io_size: %.3f\n", current_rate, delay, io_size);
 #endif
 
 		/* Timed run, if we timed out then stop */
