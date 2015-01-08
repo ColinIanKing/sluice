@@ -142,7 +142,10 @@ typedef struct {
 	uint64_t	underruns;	/* Count of underruns */
 	uint64_t	overruns;	/* Count of overruns */
 	uint64_t	delays;		/* Count of delays */
+	uint64_t	reallocs;	/* Count of buffer reallocations */
 	uint64_t	perfect;	/* Count of no under/overruns */
+	uint64_t	io_size_min;	/* Minimum buffer size */
+	uint64_t	io_size_max;	/* Maximum buffer size */
 	uint64_t	drift[DRIFT_MAX];/* Drift from desired rate */
 	uint64_t	drift_total;	/* Number of drift samples */
 	double		time_begin;	/* Time began */
@@ -178,12 +181,12 @@ static const scale_t time_scales[] = {
 };
 
 static const scale_t second_scales[] = {
-	{ 'S',	1 },
-	{ 'M',	60 },
-	{ 'H',  3600 },
-	{ 'D',  24 * 3600 },
-	{ 'W',  7 * 24 * 3600 },
-	{ 'Y',  365 * 24 * 3600 },
+	{ 's',	1 },
+	{ 'm',	60 },
+	{ 'h',  3600 },
+	{ 'd',  24 * 3600 },
+	{ 'w',  7 * 24 * 3600 },
+	{ 'y',  365 * 24 * 3600 },
 	{ ' ',  INT64_MAX },
 };
 
@@ -245,7 +248,10 @@ static inline void stats_init(stats_t *const stats)
 	stats->underruns = 0;
 	stats->overruns = 0;
 	stats->delays = 0;
+	stats->reallocs = 0;
 	stats->perfect = 0;
+	stats->io_size_min = 0;
+	stats->io_size_max = 0;
 	memset(&stats->drift, 0, sizeof(stats->drift));
 	stats->drift_total = 0;
 	stats->time_begin = 0.0;
@@ -326,7 +332,6 @@ static char *double_to_str(const double val)
  */
 static void stats_info(const stats_t *stats)
 {
-	double total = stats->underruns + stats->overruns + stats->perfect;
 	double secs = stats->time_end - stats->time_begin;
 	double avg_wr_sz;
 	struct tms t;
@@ -337,36 +342,62 @@ static void stats_info(const stats_t *stats)
 	}
 	avg_wr_sz = stats->writes ?
 		stats->buf_size_total / stats->writes : 0.0;
-	fprintf(stderr, "Data:            %s\n",
+	fprintf(stderr, "Data:             %s\n",
 		double_to_str((double)stats->total_bytes));
-	fprintf(stderr, "Reads:           %" PRIu64 "\n",
+	fprintf(stderr, "Reads:            %" PRIu64 "\n",
 		stats->reads);
-	fprintf(stderr, "Writes:          %" PRIu64 "\n",
+	fprintf(stderr, "Writes:           %" PRIu64 "\n",
 		stats->writes);
-	fprintf(stderr, "Avg. Write Size: %s\n",
+	fprintf(stderr, "Avg. Write Size:  %s\n",
 		double_to_str(avg_wr_sz));
-	fprintf(stderr, "Duration:        %.3f secs\n",
-		secs);
-	fprintf(stderr, "Delays:          %" PRIu64 "\n",
+	fprintf(stderr, "Duration:         %s\n",
+		secs_to_str(secs));
+	fprintf(stderr, "Delays:           %" PRIu64 "\n",
 		stats->delays);
+	fprintf(stderr, "Buffer reallocs:  %" PRIu64 "\n",
+		stats->reallocs);
+	fprintf(stderr, "\n");
 	if (!(opt_flags & OPT_NO_RATE_CONTROL)) {
-		fprintf(stderr, "Target rate:     %s/sec\n",
+		fprintf(stderr, "Target rate:      %s/s\n",
 			double_to_str(stats->target_rate));
 	}
-	fprintf(stderr, "Average rate:    %s/sec\n",
+	fprintf(stderr, "Average rate:     %s/s\n",
 		double_to_str((double)stats->total_bytes / secs));
-	fprintf(stderr, "Minimum rate:    %s/sec\n",
+	fprintf(stderr, "Minimum rate:     %s/s\n",
 		double_to_str(stats->rate_min));
-	fprintf(stderr, "Maximum rate:    %s/sec\n",
+	fprintf(stderr, "Maximum rate:     %s/s\n",
 		double_to_str(stats->rate_max));
+	fprintf(stderr, "Minimum buffer:   %s\n",
+		double_to_str((double)stats->io_size_min));
+	fprintf(stderr, "Maximum buffer:   %s\n",
+		double_to_str((double)stats->io_size_max));
+	if (times(&t) != (clock_t)-1) {
+		/* CPU utilitation stats, if available */
+		long int ticks_per_sec;
+
+		if ((ticks_per_sec = sysconf(_SC_CLK_TCK)) > 0) {
+			fprintf(stderr, "User time:        %s\n",
+				secs_to_str((double)t.tms_utime / (double)ticks_per_sec));
+			fprintf(stderr, "System time:      %s\n",
+				secs_to_str((double)t.tms_stime / (double)ticks_per_sec));
+			fprintf(stderr, "Total delay time: %s\n",
+				secs_to_str(secs - (double)(t.tms_utime + t.tms_stime) / (double)ticks_per_sec));
+		}
+	}
 
 	if (!(opt_flags & OPT_NO_RATE_CONTROL)) {
 		/* The following only make sense if we have rate stats */
 		int i;
 		uint64_t drift_sum = 0;
 		double last_percent = 0.0, percent = DRIFT_PERCENT_START;
+		double total = stats->underruns + stats->overruns + stats->perfect;
 
-		fprintf(stderr, "Drift from target rate: (%%)\n");
+		fprintf(stderr, "Overruns:         %6.2f%%\n", total ?
+			100.0 * (double)stats->underruns / total : 0.0);
+		fprintf(stderr, "Underruns:        %6.2f%%\n", total ?
+			100.0 * (double)stats->overruns / total : 0.0);
+
+		fprintf(stderr, "\nDrift from target rate: (%%)\n");
 		for (i = 0; i < DRIFT_MAX; i++, percent *= 2.0) {
 			fprintf(stderr, "  %6.3f%% - %6.3f%%: %6.2f%%\n",
 				last_percent, percent - 0.0001,
@@ -379,21 +410,6 @@ static void stats_info(const stats_t *stats)
 			(double)last_percent,
 			stats->drift_total ?
 				100.0 - ((100.0 * (double)drift_sum) / (double)stats->drift_total) : 0.0);
-		fprintf(stderr, "Overruns:        %6.2f%%\n", total ?
-			100.0 * (double)stats->underruns / total : 0.0);
-		fprintf(stderr, "Underruns:       %6.2f%%\n", total ?
-			100.0 * (double)stats->overruns / total : 0.0);
-	}
-	if (times(&t) != (clock_t)-1) {
-		/* CPU utilitation stats, if available */
-		long int ticks_per_sec;
-
-		if ((ticks_per_sec = sysconf(_SC_CLK_TCK)) > 0) {
-			fprintf(stderr, "User time:       %.3f secs\n",
-				(double)t.tms_utime / (double)ticks_per_sec);
-			fprintf(stderr, "System time:     %.3f secs\n",
-				(double)t.tms_stime / (double)ticks_per_sec);
-		}
 	}
 }
 
@@ -1067,9 +1083,15 @@ redo_write:
 				stats.rate_max = current_rate;
 			if (current_rate < stats.rate_min)
 				stats.rate_min = current_rate;
+			if (io_size > stats.io_size_max)
+				stats.io_size_max = io_size;
+			if (io_size < stats.io_size_min)
+				stats.io_size_min = io_size;
 		} else {
 			stats.rate_min = current_rate;
 			stats.rate_max = current_rate;
+			stats.io_size_min = io_size;
+			stats.io_size_max = io_size;
 			stats.rate_set = true;
 		}
 
@@ -1159,7 +1181,9 @@ redo_write:
 					tmp_io_size = io_size + (data_rate - current_rate) * const_delay;
 				}
 
-				if (tmp_io_size < IO_SIZE_MAX) {
+				/* Need to grow buffer? */
+				if ((tmp_io_size > io_size) && (tmp_io_size < IO_SIZE_MAX)) {
+					stats.reallocs++;
 					tmp = realloc(buffer, BUF_SIZE(tmp_io_size));
 					if (tmp) {
 						if (opt_flags & OPT_ZERO)
@@ -1188,7 +1212,9 @@ redo_write:
 					tmp_io_size = io_size + (data_rate - current_rate) * const_delay;
 				}
 
-				if (tmp_io_size > IO_SIZE_MIN) {
+				/* Need to grow buffer? */
+				if ((tmp_io_size > io_size) && (tmp_io_size < IO_SIZE_MAX)) {
+					stats.reallocs++;
 					tmp = realloc(buffer, BUF_SIZE(tmp_io_size));
 					if (tmp) {
 						if (opt_flags & OPT_ZERO)
@@ -1259,7 +1285,6 @@ redo_write:
 #if DEBUG_RATE
 		fprintf(stderr, "rate-post: %.2f delay: %.2f io_size: %.3f\n", current_rate, delay, io_size);
 #endif
-
 		/* Timed run, if we timed out then stop */
 		if ((opt_flags & OPT_TIMED_RUN) &&
 		    ((secs_now - secs_start) > timed_run))
