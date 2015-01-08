@@ -562,30 +562,31 @@ static void show_usage(void)
 {
 	printf("%s, version %s\n\n", app_name, VERSION);
 	printf("Usage: %s [options]\n", app_name);
-	printf("  -a        append to file (-t, -O options only).\n");
-	printf("  -c delay  specify constant delay time (seconds).\n");
-	printf("  -d        discard input (no output).\n");
-	printf("  -D        delay mode.\n");
-	printf("  -e        skip read errors.\n");
-	printf("  -f freq   frequency of -v statistics.\n");
-	printf("  -h        print this help.\n");
-	printf("  -i size   set io read/write size in bytes.\n");
-	printf("  -m size   set maximum amount to process.\n");
-	printf("  -n        no rate controls, just copy data untouched.\n");
-	printf("  -o        shrink read/write buffer to avoid overrun.\n");
-	printf("  -O file   short cut for -dt file; output to a file.\n");
-	printf("  -p        enable verbose mode with progress stats.\n");
-	printf("  -r rate   set rate (in bytes per second).\n");
-	printf("  -R	    ignore stdin, read from %s.\n", dev_urandom);
-	printf("  -s shift  controls delay or buffer size adjustment.\n");
-	printf("  -S        display statistics at end of stream to stderr.\n");
-	printf("  -t file   tee output to file.\n");
-	printf("  -T time   stop after a specified amount of time.\n");
-	printf("  -u        expand read/write buffer to avoid underrun.\n");
-	printf("  -v        set verbose mode (to stderr).\n");
-	printf("  -V        print version information.\n");
-	printf("  -w        warn on data rate underrun.\n");
-	printf("  -z        ignore stdin, generate zeros.\n");
+	printf("  -a         append to file (-t, -O options only).\n");
+	printf("  -c delay   specify constant delay time (seconds).\n");
+	printf("  -d         discard input (no output).\n");
+	printf("  -D         delay mode.\n");
+	printf("  -e         skip read errors.\n");
+	printf("  -f freq    frequency of -v statistics.\n");
+	printf("  -h         print this help.\n");
+	printf("  -i size    set io read/write size in bytes.\n");
+	printf("  -m size    set maximum amount to process.\n");
+	printf("  -n         no rate controls, just copy data untouched.\n");
+	printf("  -o         shrink read/write buffer to avoid overrun.\n");
+	printf("  -O file    short cut for -dt file; output to a file.\n");
+	printf("  -p         enable verbose mode with progress stats.\n");
+	printf("  -P pidfile save process ID intp file pidfile.\n");
+	printf("  -r rate    set rate (in bytes per second).\n");
+	printf("  -R	     ignore stdin, read from %s.\n", dev_urandom);
+	printf("  -s shift   controls delay or buffer size adjustment.\n");
+	printf("  -S         display statistics at end of stream to stderr.\n");
+	printf("  -t file    tee output to file.\n");
+	printf("  -T time    stop after a specified amount of time.\n");
+	printf("  -u         expand read/write buffer to avoid underrun.\n");
+	printf("  -v         set verbose mode (to stderr).\n");
+	printf("  -V         print version information.\n");
+	printf("  -w         warn on data rate underrun.\n");
+	printf("  -z         ignore stdin, generate zeros.\n");
 }
 
 #define DELAY(delay, stats)						\
@@ -641,24 +642,31 @@ int main(int argc, char **argv)
 	char *buffer = NULL;		/* Temp I/O buffer */
 	char *out_filename = NULL;	/* -t or -O option filename */
 	char *in_filename = NULL;	/* -I option filename */
+	char *pid_filename = NULL;	/* -P option filename */
+
 	double delay;
-	uint64_t last_delay = 0;	/* Delays in 1/1000000 of a second */
 	double io_size = 0.9;		/* -i IO buffer size */
 	double data_rate = 0.0;		/* -r data rate */
+	double secs_start, secs_last, freq = DEFAULT_FREQ;
+	double const_delay = -1.0;	/* -c delay time between I/O */
+
+	uint64_t last_delay = 0;	/* Delays in 1/1000000 of a second */
 	uint64_t total_bytes = 0;	/* cumulative number of bytes read */
 	uint64_t max_trans = 0;		/* -m maximum data transferred */
 	uint64_t adjust_shift = 0;	/* -s adjustment scaling shift */
 	uint64_t timed_run = 0;		/* -T timed run duration */
+	uint64_t delay_mode = DELAY_D_R_W;
+
 	off_t progress_size = 0;
+
 	int underrun_adjust = UNDERRUN_ADJUST_MAX;
 	int overrun_adjust = OVERRUN_ADJUST_MAX;
 	int fdin = -1, fdout, fdtee = -1;
 	int underruns = 0, overruns = 0, warnings = 0;
 	int ret = EXIT_FAILURE;
-	uint64_t delay_mode = DELAY_D_R_W;
-	double secs_start, secs_last, freq = DEFAULT_FREQ;
-	double const_delay = -1.0;	/* -c delay time between I/O */
+
 	bool eof = false;		/* EOF on input */
+
 	stats_t stats;			/* Data rate statistics */
 	struct sigaction new_action;
 	delay_info_t *di = NULL;
@@ -666,7 +674,7 @@ int main(int argc, char **argv)
 	stats_init(&stats);
 
 	for (;;) {
-		const int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:SnT:I:VpeD:");
+		const int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:SnT:I:VpeD:P:");
 		size_t len;
 
 		if (c == -1)
@@ -723,6 +731,9 @@ int main(int argc, char **argv)
 		case 'p':
 			opt_flags |= (OPT_PROGRESS | OPT_VERBOSE);
 			break;
+		case 'P':
+			pid_filename = optarg;
+			break;
 		case 'r':
 			data_rate = get_double_byte(optarg);
 			opt_flags |= OPT_GOT_RATE;
@@ -770,6 +781,17 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (pid_filename) {
+		FILE *pid_file = fopen(pid_filename, "w");
+		if (pid_file) {
+			fprintf(pid_file, "%d\n", getpid());
+			(void)fclose(pid_file);
+		} else {
+			fprintf(stderr, "Cannot create pid file '%s', errno=%d (%s).\n",
+				pid_filename, errno, strerror(errno));
+			goto tidy;
+		}
+	}
 	if ((di = get_delay_info(delay_mode)) == NULL)
 		goto tidy;
 	if ((opt_flags & OPT_NO_RATE_CONTROL) &&
@@ -1304,6 +1326,9 @@ finish:
 		stats_info(&stats);
 	}
 tidy:
+	if (pid_filename) {
+		(void)unlink(pid_filename);
+	}
 
 	if ((fdin != -1) && (opt_flags & OPT_URANDOM)) {
 		(void)close(fdin);
