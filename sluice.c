@@ -141,6 +141,7 @@ typedef struct {
 	uint64_t	total_bytes;	/* Total bytes copied */
 	uint64_t	underruns;	/* Count of underruns */
 	uint64_t	overruns;	/* Count of overruns */
+	uint64_t	delays;		/* Count of delays */
 	uint64_t	perfect;	/* Count of no under/overruns */
 	uint64_t	drift[DRIFT_MAX];/* Drift from desired rate */
 	uint64_t	drift_total;	/* Number of drift samples */
@@ -243,6 +244,7 @@ static inline void stats_init(stats_t *const stats)
 	stats->total_bytes = 0;
 	stats->underruns = 0;
 	stats->overruns = 0;
+	stats->delays = 0;
 	stats->perfect = 0;
 	memset(&stats->drift, 0, sizeof(stats->drift));
 	stats->drift_total = 0;
@@ -345,6 +347,8 @@ static void stats_info(const stats_t *stats)
 		double_to_str(avg_wr_sz));
 	fprintf(stderr, "Duration:        %.3f secs\n",
 		secs);
+	fprintf(stderr, "Delays:          %" PRIu64 "\n",
+		stats->delays);
 	if (!(opt_flags & OPT_NO_RATE_CONTROL)) {
 		fprintf(stderr, "Target rate:     %s/sec\n",
 			double_to_str(stats->target_rate));
@@ -568,8 +572,9 @@ static void show_usage(void)
 	printf("  -z        ignore stdin, generate zeros.\n");
 }
 
-#define DELAY(delay)							\
+#define DELAY(delay, stats)						\
 	if (delay > 0) {						\
+		stats.delays++;						\
 		if (usleep((useconds_t)delay) < 0) {			\
 			if (errno == EINTR) {				\
 				if (sluice_finish)			\
@@ -591,9 +596,9 @@ static void show_usage(void)
 		}							\
 	}
 
-#define DO_DELAY(delay, di, n)						\
+#define DO_DELAY(delay, di, n, stats)					\
 	if (DELAY_GET_ACTION(n, di->action))				\
-		DELAY(delay / di->divisor);
+		DELAY(delay / di->divisor, stats);
 
 static delay_info_t *get_delay_info(uint64_t delay_mode)
 {
@@ -968,7 +973,7 @@ int main(int argc, char **argv)
 		bool complete = false;
 		double current_rate, secs_now;
 
-		DO_DELAY(delay, di, 0);
+		DO_DELAY(delay, di, 0, stats);
 
 		if (opt_flags & OPT_ZERO) {
 			inbufsize = (uint64_t)io_size;
@@ -1018,7 +1023,7 @@ int main(int argc, char **argv)
 			}
 		}
 
-		DO_DELAY(delay, di, 1);
+		DO_DELAY(delay, di, 1, stats);
 
 		stats.writes++;
 		stats.total_bytes += inbufsize;
@@ -1050,7 +1055,7 @@ redo_write:
 		if (eof)
 			break;
 
-		DO_DELAY(delay, di, 2);
+		DO_DELAY(delay, di, 2, stats);
 
 		if ((secs_now = timeval_to_double()) < 0.0)
 			goto tidy;
