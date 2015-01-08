@@ -1,3 +1,17 @@
+sluice (0.01.14-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Add more meaningful error exit return values.
+  * Add Kamal to man page because of all the useful guidance provided
+  * Add -P pidfile option
+  * Add more stats info
+  * Add delay counts to stats
+  * Make io_rate double precision for more accuracy in -c mode
+  * Adjust io_size with double precision rather than integer math.
+  * Add delay mode option -D
+
+ -- Colin King <colin.king@canonical.com>  Thu, 8 Jan 2015 11:55:01 +0000
+
 sluice (0.01.13-1) unstable; urgency=medium
 
   * Makefile: bump version
