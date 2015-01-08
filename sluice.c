@@ -98,8 +98,8 @@
 #define BUF_SIZE(sz)		((((size_t)sz) < 1) ? 1 : ((size_t)sz))
 
 /* R = read, W = write, D = delay */
-#define DELAY_D_R_W		(0x00000000)	/* full delay */
-#define DELAY_R_W_D		(0x00000001)	/* full delay */
+#define DELAY_R_W_D		(0x00000000)	/* full delay */
+#define DELAY_D_R_W		(0x00000001)	/* full delay */
 #define DELAY_R_D_W		(0x00000002)	/* full delay */
 #define DELAY_D_R_D_W		(0x00000003)	/* 2 * 1/2 delay */
 #define DELAY_R_D_W_D		(0x00000004)	/* 2 * 1/2 delay */
