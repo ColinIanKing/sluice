@@ -1320,7 +1320,7 @@ redo_write:
 				/* Progress % and ETA estimates */
 				double secs = secs_now - secs_start;
 				if (progress_size) {
-					double percent = 100.0 * (double)stats.total_bytes / (double)progress_size;
+					double percent = 100.0 * (double)progress_size / (double)stats.total_bytes;
 					double alpha = secs * (double)progress_size / (double)stats.total_bytes;
 					double secs_left = alpha - secs;
 
