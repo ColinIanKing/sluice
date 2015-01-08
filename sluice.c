@@ -665,7 +665,7 @@ int main(int argc, char **argv)
 	uint64_t max_trans = 0;		/* -m maximum data transferred */
 	uint64_t adjust_shift = 0;	/* -s adjustment scaling shift */
 	uint64_t timed_run = 0;		/* -T timed run duration */
-	uint64_t delay_mode = DELAY_D_R_W;
+	uint64_t delay_mode = DELAY_R_W_D; /* read, write then delay */
 
 	off_t progress_size = 0;
 
