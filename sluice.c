@@ -86,6 +86,15 @@
 #define OPT_SKIP_READ_ERRORS	(0x00040000)	/* -e */
 #define OPT_GOT_SHIFT		(0x00080000)	/* -s */
 
+#define EXIT_BAD_OPTION		(1)
+#define EXIT_FILE_ERROR		(2)
+#define EXIT_DELAY_ERROR	(3)
+#define EXIT_TIME_ERROR		(4)
+#define EXIT_SIGNAL_ERROR	(5)
+#define EXIT_READ_ERROR		(6)
+#define EXIT_WRITE_ERROR	(7)
+#define EXIT_ALLOC_ERROR	(8)
+
 #define BUF_SIZE(sz)		((((size_t)sz) < 1) ? 1 : ((size_t)sz))
 
 /* R = read, W = write, D = delay */
@@ -447,11 +456,11 @@ static uint64_t get_uint64(const char *const str, size_t *const len)
 	val = (uint64_t)strtoull(str, NULL, 10);
 	if (errno) {
 		fprintf(stderr, "Invalid value %s.\n", str);
-		exit(EXIT_FAILURE);
+		exit(EXIT_BAD_OPTION);
 	}
 	if (*len == 0) {
 		fprintf(stderr, "Value %s is an invalid size.\n", str);
-		exit(EXIT_FAILURE);
+		exit(EXIT_BAD_OPTION);
 	}
 	return val;
 }
@@ -469,11 +478,11 @@ static double get_double(const char *const str, size_t *const len)
 	val = strtod(str, NULL);
 	if (errno) {
 		fprintf(stderr, "Invalid value %s.\n", str);
-		exit(EXIT_FAILURE);
+		exit(EXIT_BAD_OPTION);
 	}
 	if (*len == 0) {
 		fprintf(stderr, "Value %s is an invalid size.\n", str);
-		exit(EXIT_FAILURE);
+		exit(EXIT_BAD_OPTION);
 	}
 	return val;
 }
@@ -499,7 +508,7 @@ static double get_double_scale(
 
 	if (val < 0.0) {
 		printf("Value %s cannot be negative\n", str);
-		exit(EXIT_FAILURE);
+		exit(EXIT_BAD_OPTION);
 	}
 
 	if (isdigit(ch) || ch == '.')
@@ -512,7 +521,7 @@ static double get_double_scale(
 	}
 
 	printf("Illegal %s specifier %c\n", msg, str[len]);
-	exit(EXIT_FAILURE);
+	exit(EXIT_BAD_OPTION);
 }
 
 /*
@@ -608,6 +617,7 @@ static void show_usage(void)
 				fprintf(stderr, "usleep error: "	\
 					"errno=%d (%s).\n",		\
 					errno, strerror(errno));	\
+				ret = EXIT_DELAY_ERROR;			\
 				goto tidy;				\
 			}						\
 		}							\
@@ -663,7 +673,7 @@ int main(int argc, char **argv)
 	int overrun_adjust = OVERRUN_ADJUST_MAX;
 	int fdin = -1, fdout, fdtee = -1;
 	int underruns = 0, overruns = 0, warnings = 0;
-	int ret = EXIT_FAILURE;
+	int ret = EXIT_SUCCESS;
 
 	bool eof = false;		/* EOF on input */
 
@@ -774,10 +784,10 @@ int main(int argc, char **argv)
 			break;
 		case '?':
 			printf("Try '%s -h' for more information.\n", app_name);
-			exit(EXIT_FAILURE);
+			exit(EXIT_BAD_OPTION);
 		default:
 			show_usage();
-			exit(EXIT_FAILURE);
+			exit(EXIT_BAD_OPTION);
 		}
 	}
 
@@ -789,37 +799,46 @@ int main(int argc, char **argv)
 		} else {
 			fprintf(stderr, "Cannot create pid file '%s', errno=%d (%s).\n",
 				pid_filename, errno, strerror(errno));
+			ret = EXIT_FILE_ERROR;
 			goto tidy;
 		}
 	}
-	if ((di = get_delay_info(delay_mode)) == NULL)
+	if ((di = get_delay_info(delay_mode)) == NULL) {
+		ret = EXIT_FILE_ERROR;
 		goto tidy;
+	}
 	if ((opt_flags & OPT_NO_RATE_CONTROL) &&
             (opt_flags & (OPT_GOT_CONST_DELAY | OPT_GOT_RATE | OPT_UNDERRUN | OPT_OVERRUN))) {
 		fprintf(stderr, "Cannot use -n option with -c, -r, -u or -o options.\n");
+		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
 	if (!out_filename && (opt_flags & OPT_APPEND)) {
 		fprintf(stderr, "Must use -t filename when using the -a option.\n");
+		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
 	if (!(opt_flags & (OPT_GOT_RATE | OPT_NO_RATE_CONTROL))) {
 		fprintf(stderr, "Must specify data rate with -r option.\n");
+		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
 	if ((opt_flags & (OPT_GOT_IOSIZE | OPT_GOT_CONST_DELAY)) ==
 	    (OPT_GOT_IOSIZE | OPT_GOT_CONST_DELAY)) {
 		fprintf(stderr, "Cannot use both -i and -c options together.\n");
+		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
 	if ((opt_flags & OPT_GOT_RATE) && (data_rate < DATA_RATE_MIN)) {
 		fprintf(stderr, "Rate value %.2f too low. Minimum allowed is %.2f bytes/sec.\n",
 			data_rate, DATA_RATE_MIN);
+		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
 	if (freq < FREQ_MIN) {
 		fprintf(stderr, "Frequency %.3f too low. Minimum allowed is %.3f Hz.\n",
 			freq, FREQ_MIN);
+		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
 #if DELAY_SHIFT_MIN > 0
@@ -829,12 +848,14 @@ int main(int argc, char **argv)
 #endif
 		fprintf(stderr, "Delay shift must be %d .. %d.\n",
 			DELAY_SHIFT_MIN, DELAY_SHIFT_MAX);
+		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
 	if ((opt_flags & OPT_GOT_CONST_DELAY) &&
 	    (const_delay < DELAY_MIN || const_delay > DELAY_MAX)) {
 		fprintf(stderr, "Delay time must be %.2f .. %.2f seconds.\n",
 			DELAY_MIN, DELAY_MAX);
+		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
 
@@ -846,10 +867,12 @@ int main(int argc, char **argv)
 			io_size = data_rate * const_delay;
 			if (io_size < IO_SIZE_MIN) {
 				fprintf(stderr, "Delay too small, internal buffer too small.\n");
+				ret = EXIT_BAD_OPTION;
 				goto tidy;
 			}
 			if (io_size > IO_SIZE_MAX) {
 				fprintf(stderr, "Delay too large, internal buffer too big.\n");
+				ret = EXIT_BAD_OPTION;
 				goto tidy;
 			}
 		}
@@ -869,6 +892,7 @@ int main(int argc, char **argv)
 					fprintf(stderr, "Rate too high, maximum allowed: %s/sec.\n",
 						double_to_str((double)IO_SIZE_MAX * 32.0));
 					fprintf(stderr, "Use -i to explictly set buffer size.\n");
+					ret = EXIT_BAD_OPTION;
 					goto tidy;
 				}
 			}
@@ -881,10 +905,12 @@ int main(int argc, char **argv)
 	if ((io_size < IO_SIZE_MIN) || (io_size > IO_SIZE_MAX)) {
 		fprintf(stderr, "I/O buffer size too large, maximum allowed: %s.\n",
 			double_to_str((double)IO_SIZE_MAX));
+		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
 	if ((buffer = malloc(BUF_SIZE(io_size))) == NULL) {
 		fprintf(stderr,"Cannot allocate buffer of %.0f bytes.\n", io_size);
+		ret = EXIT_ALLOC_ERROR;
 		goto tidy;
 	}
 	if (opt_flags & OPT_ZERO)
@@ -892,6 +918,7 @@ int main(int argc, char **argv)
 
 	if (count_bits(opt_flags & (OPT_ZERO | OPT_URANDOM | OPT_INPUT_FILE)) > 1) {
 		fprintf(stderr, "Cannot use -z, -R or -I options together.\n");
+		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
 
@@ -902,13 +929,16 @@ int main(int argc, char **argv)
 		if (fdin < 0) {
 			fprintf(stderr, "open on %s failed: errno = %d (%s).\n",
 				in_filename, errno, strerror(errno));
+			ret = EXIT_FILE_ERROR;
 			goto tidy;
 		}
 		if (fstat(fdin, &buf) < 0) {
-			fprintf(stderr, "fstat on file %s failed: errnp = %d (%s).\n",
+			fprintf(stderr, "fstat on file %s failed: errno = %d (%s).\n",
 				in_filename, errno, strerror(errno));
+			progress_size = 0;
+		} else {
+			progress_size = buf.st_size;
 		}
-		progress_size = buf.st_size;
 	}
 	if (opt_flags & OPT_MAX_TRANS_SIZE)
 		progress_size = (off_t)max_trans;
@@ -918,6 +948,7 @@ int main(int argc, char **argv)
 		if (fdin < 0) {
 			fprintf(stderr, "Cannot open %s: errno=%d (%s).\n",
 				dev_urandom, errno, strerror(errno));
+			ret = EXIT_FILE_ERROR;
 			goto tidy;
 		}
 	}
@@ -929,6 +960,7 @@ int main(int argc, char **argv)
 		if (fdtee < 0) {
 			fprintf(stderr, "open on %s failed: errno = %d (%s).\n",
 				out_filename, errno, strerror(errno));
+			ret = EXIT_FILE_ERROR;
 			goto tidy;
 		}
 	}
@@ -938,8 +970,10 @@ int main(int argc, char **argv)
 		fdin = fileno(stdin);
 	fdout = fileno(stdout);
 
-	if ((secs_start = timeval_to_double()) < 0.0)
+	if ((secs_start = timeval_to_double()) < 0.0) {
+		ret = EXIT_TIME_ERROR;
 		goto tidy;
+	}
 
 	if (opt_flags & OPT_NO_RATE_CONTROL) {
 		delay = 0.0;
@@ -969,6 +1003,7 @@ int main(int argc, char **argv)
 	if (sigaction(SIGINT, &new_action, NULL) < 0) {
 		fprintf(stderr, "Sigaction failed: errno=%d (%s).\n",
 			errno, strerror(errno));
+		ret = EXIT_SIGNAL_ERROR;
 		goto tidy;
 	}
 
@@ -979,12 +1014,14 @@ int main(int argc, char **argv)
 	if (sigaction(SIGUSR1, &new_action, NULL) < 0) {
 		fprintf(stderr, "Sigaction failed: errno=%d (%s).\n",
 			errno, strerror(errno));
+		ret = EXIT_SIGNAL_ERROR;
 		goto tidy;
 	}
 #ifdef SIGINFO
 	if (sigaction(SIGINFO, &new_action, NULL) < 0) {
 		fprintf(stderr, "Sigaction failed: errno=%d (%s).\n",
 			errno, strerror(errno));
+		ret = EXIT_SIGNAL_ERROR;
 		goto tidy;
 	}
 #endif
@@ -995,6 +1032,7 @@ int main(int argc, char **argv)
 	if (sigaction(SIGUSR2, &new_action, NULL) < 0) {
 		fprintf(stderr, "Sigaction failed: errno=%d (%s).\n",
 			errno, strerror(errno));
+		ret = EXIT_SIGNAL_ERROR;
 		goto tidy;
 	}
 
@@ -1047,6 +1085,7 @@ int main(int argc, char **argv)
 					} else {
 						fprintf(stderr,"read error: errno=%d (%s).\n",
 							errno, strerror(errno));
+						ret = EXIT_READ_ERROR;
 						goto tidy;
 					}
 				}
@@ -1070,6 +1109,7 @@ int main(int argc, char **argv)
 			if (write(fdout, buffer, (size_t)inbufsize) < 0) {
 				fprintf(stderr,"Write error: errno=%d (%s).\n",
 					errno, strerror(errno));
+				ret = EXIT_WRITE_ERROR;
 				goto tidy;
 			}
 		}
@@ -1086,6 +1126,7 @@ redo_write:
 				} else {
 					fprintf(stderr, "write error: errno=%d (%s).\n",
 						errno, strerror(errno));
+					ret = EXIT_WRITE_ERROR;
 					goto tidy;
 				}
 			}
@@ -1095,8 +1136,10 @@ redo_write:
 
 		DO_DELAY(delay, di, 2, stats);
 
-		if ((secs_now = timeval_to_double()) < 0.0)
+		if ((secs_now = timeval_to_double()) < 0.0) {
+			ret = EXIT_TIME_ERROR;
 			goto tidy;
+		}
 		current_rate = ((double)total_bytes) / (secs_now - secs_start);
 
 		/* Update min/max rate stats */
@@ -1321,8 +1364,10 @@ finish:
 		fprintf(stderr, "%78s\r", "");
 
 	if (opt_flags & OPT_STATS) {
-		if ((stats.time_end = timeval_to_double()) < 0.0)
+		if ((stats.time_end = timeval_to_double()) < 0.0) {
+			ret = EXIT_TIME_ERROR;
 			goto tidy;
+		}
 		stats_info(&stats);
 	}
 tidy:

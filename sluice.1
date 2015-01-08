@@ -191,10 +191,25 @@ Read data from somehost.com on port 1234 at a rate of 2MB per second and discard
 .RS 8
 nc somehost.com 1234 | sluice -d -r 2MB -i 8K
 .RE
+.SH EXIT STATUS
+Sluice sets the exit status as follows:
+.TS
+center;
+cB cB
+c l.
+Status	Decription
+0	Exited successfully.
+1	Invalid or out of range option provided.
+2	File open error.
+3	Sleep error.
+4	Failed to get time of day.
+5	Signal handler setup error.
+6	Read error (file or stdin).
+7	Write error (file or stdout).
+8	Buffer allocation failed.
+.TE
 .SH BUGS
-Stopping and starting sluice using SIGSTOP and SIGCONT will interfere with the internal buffering
-rate calculations causing sluice to try to catch up and this may affect the short term data rate
-immediately after the SIGCONT.
+Stopping and starting sluice using SIGSTOP and SIGCONT will interfere with the internal buffering rate calculations causing sluice to try to catch up and this may affect the short term data rate immediately after the SIGCONT.
 .SH SEE ALSO
 .BR cat(1),
 .BR pv(1),
