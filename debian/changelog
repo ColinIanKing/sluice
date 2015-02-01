@@ -1,3 +1,11 @@
+sluice (0.01.17-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Add -f caveat
+  * Correct ETA estimation, got it inverted
+
+ -- Colin King <colin.king@canonical.com>  Sun, 1 Feb 2015 17:17:21 +0000
+
 sluice (0.01.16-1) unstable; urgency=medium
 
   * Bump version once more
