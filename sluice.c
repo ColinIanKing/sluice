@@ -891,7 +891,7 @@ int main(int argc, char **argv)
 				if (io_size > IO_SIZE_MAX) {
 					fprintf(stderr, "Rate too high, maximum allowed: %s/sec.\n",
 						double_to_str((double)IO_SIZE_MAX * 32.0));
-					fprintf(stderr, "Use -i to explictly set buffer size.\n");
+					fprintf(stderr, "Use -i to explicitly set buffer size.\n");
 					ret = EXIT_BAD_OPTION;
 					goto tidy;
 				}
