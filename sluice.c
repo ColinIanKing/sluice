@@ -203,7 +203,7 @@ static const scale_t second_scales[] = {
  *  count_bits()
  *      count bits set, from C Programming Language 2nd Ed
  */
-static unsigned int count_bits(const unsigned int val)
+static inline unsigned int count_bits(const unsigned int val)
 {
 	register unsigned int c, n = val;
 
@@ -540,7 +540,7 @@ static inline uint64_t get_uint64_scale(
  *  get_uint64_byte()
  *	size in bytes, K bytes, M bytes, G bytes, T bytes or P bytes
  */
-static uint64_t get_uint64_byte(const char *const str)
+static inline uint64_t get_uint64_byte(const char *const str)
 {
 	return get_uint64_scale(str, byte_scales, "length");
 }
@@ -549,7 +549,7 @@ static uint64_t get_uint64_byte(const char *const str)
  *  get_double_byte()
  *	size in bytes, K bytes, M bytes, G bytes, T bytes or P bytes
  */
-static double get_double_byte(const char *const str)
+static inline double get_double_byte(const char *const str)
 {
 	return get_double_scale(str, byte_scales, "length");
 }
@@ -558,7 +558,7 @@ static double get_double_byte(const char *const str)
  *  get_uint64_time()
  *	time in seconds, minutes, hours, days or years
  */
-uint64_t get_uint64_time(const char *const str)
+static inline uint64_t get_uint64_time(const char *const str)
 {
 	return get_uint64_scale(str, time_scales, "time");
 }
