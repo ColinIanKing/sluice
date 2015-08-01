@@ -285,7 +285,8 @@ static char *secs_to_str(const double secs)
 		if (secs <= second_scales[i + 1].scale)
 			break;
 	}
-	snprintf(buf, sizeof(buf), "%.2f %c", secs / second_scales[i].scale, second_scales[i].ch);
+	snprintf(buf, sizeof(buf), "%.2f %c",
+		secs / second_scales[i].scale, second_scales[i].ch);
 	return buf;
 }
 
@@ -386,11 +387,14 @@ static void stats_info(const stats_t *stats)
 
 		if ((ticks_per_sec = sysconf(_SC_CLK_TCK)) > 0) {
 			fprintf(stderr, "User time:        %s\n",
-				secs_to_str((double)t.tms_utime / (double)ticks_per_sec));
+				secs_to_str((double)t.tms_utime /
+					(double)ticks_per_sec));
 			fprintf(stderr, "System time:      %s\n",
-				secs_to_str((double)t.tms_stime / (double)ticks_per_sec));
+				secs_to_str((double)t.tms_stime /
+					(double)ticks_per_sec));
 			fprintf(stderr, "Total delay time: %s\n",
-				secs_to_str(secs - (double)(t.tms_utime + t.tms_stime) / (double)ticks_per_sec));
+				secs_to_str(secs - (double)(t.tms_utime +
+					t.tms_stime) / (double)ticks_per_sec));
 		}
 	}
 
@@ -399,7 +403,8 @@ static void stats_info(const stats_t *stats)
 		int i;
 		uint64_t drift_sum = 0;
 		double last_percent = 0.0, percent = DRIFT_PERCENT_START;
-		double total = stats->underruns + stats->overruns + stats->perfect;
+		double total = stats->underruns +
+			       stats->overruns + stats->perfect;
 
 		fprintf(stderr, "Overruns:         %6.2f%%\n", total ?
 			100.0 * (double)stats->underruns / total : 0.0);
@@ -411,14 +416,16 @@ static void stats_info(const stats_t *stats)
 			fprintf(stderr, "  %6.3f%% - %6.3f%%: %6.2f%%\n",
 				last_percent, percent - 0.0001,
 				stats->drift_total ?
-					100.0 * (double)stats->drift[i] / (double)stats->drift_total : 0.0);
+					100.0 * (double)stats->drift[i] /
+					(double)stats->drift_total : 0.0);
 			last_percent = percent;
 			drift_sum += stats->drift[i];
 		}
 		fprintf(stderr, " >%6.3f%%          : %6.2f%%\n",
 			(double)last_percent,
 			stats->drift_total ?
-				100.0 - ((100.0 * (double)drift_sum) / (double)stats->drift_total) : 0.0);
+				100.0 - ((100.0 * (double)drift_sum) /
+				(double)stats->drift_total) : 0.0);
 	}
 }
 
@@ -632,7 +639,8 @@ static delay_info_t *get_delay_info(uint64_t delay_mode)
 	int i;
 
 	if (delay_mode > DELAY_MODE_MAX) {
-		fprintf(stderr, "Delay mode -D %" PRIu64 " is too large, range 0..%u.\n",
+		fprintf(stderr, "Delay mode -D %" PRIu64
+			" is too large, range 0..%u.\n",
 			delay_mode, DELAY_MODE_MAX);
 		return NULL;
 	}
@@ -684,7 +692,8 @@ int main(int argc, char **argv)
 	stats_init(&stats);
 
 	for (;;) {
-		const int c = getopt(argc, argv, "ar:h?i:vm:wudot:f:zRs:c:O:SnT:I:VpeD:P:");
+		const int c = getopt(argc, argv,
+			"ar:h?i:vm:wudot:f:zRs:c:O:SnT:I:VpeD:P:");
 		size_t len;
 
 		if (c == -1)
@@ -881,8 +890,9 @@ int main(int argc, char **argv)
 				io_size = 4 * KB;
 			} else {
 				/*
-				 * User has not specified -i or -c, so define the io_size
-				 * base on 1/32 of the data rate, e.g. ~32 writes per second
+				 * User has not specified -i or -c, so define
+				 * the io_size based on 1/32 of the data rate,
+				 * e.g. ~32 writes per second
 				 */
 				io_size = data_rate / 32.0;
 				/* Make sure we don't have small sized I/O */
@@ -909,7 +919,8 @@ int main(int argc, char **argv)
 		goto tidy;
 	}
 	if ((buffer = malloc(BUF_SIZE(io_size))) == NULL) {
-		fprintf(stderr,"Cannot allocate buffer of %.0f bytes.\n", io_size);
+		fprintf(stderr,"Cannot allocate buffer of %.0f bytes.\n",
+			io_size);
 		ret = EXIT_ALLOC_ERROR;
 		goto tidy;
 	}
@@ -988,7 +999,8 @@ int main(int argc, char **argv)
 	fprintf(stderr, "data_rate:       %f\n", data_rate);
 	fprintf(stderr, "const_delay:     %f\n", const_delay);
 	fprintf(stderr, "delay:           %f\n", delay);
-	fprintf(stderr, "progress_size:   %" PRIu64 "\n", (uint64_t)progress_size);
+	fprintf(stderr, "progress_size:   %" PRIu64 "\n",
+		(uint64_t)progress_size);
 	fprintf(stderr, "max_trans:       %" PRIu64 "\n", max_trans);
 	fprintf(stderr, "shift:           %" PRIu64 "\n", adjust_shift);
 #endif
@@ -1062,12 +1074,14 @@ int main(int argc, char **argv)
 				uint64_t sz = (uint64_t)io_size - inbufsize;
 				ssize_t n;
 
-				/* We hit the user specified max limit to transfer */
+				/*
+				 * We hit the user specified max
+				 * limit to transfer
+				 */
 				if (max_trans && (total_bytes + sz) > max_trans) {
 					sz = max_trans - total_bytes;
 					complete = true;
 				}
-
 
 				n = read(fdin, ptr, (ssize_t)sz);
 				if (n < 0) {
@@ -1164,7 +1178,8 @@ redo_write:
 
 		/* Update drift stats only if we have rate controls enabled */
 		if (!(opt_flags & OPT_NO_RATE_CONTROL)) {
-			double drift_rate = 100.0 * fabs(current_rate - data_rate) / data_rate;
+			double drift_rate = 100.0 *
+				fabs(current_rate - data_rate) / data_rate;
 			int i;
 			double percent = DRIFT_PERCENT_START;
 
@@ -1177,7 +1192,8 @@ redo_write:
 			}
 		}
 #if DEBUG_RATE
-		fprintf(stderr, "rate-pre : %.2f delay: %.2f io_size: %.3f\n", current_rate, delay, io_size);
+		fprintf(stderr, "rate-pre : %.2f delay: %.2f io_size: %.3f\n",
+			current_rate, delay, io_size);
 #endif
 
 		if (opt_flags & OPT_NO_RATE_CONTROL) {
@@ -1240,16 +1256,25 @@ redo_write:
 				if (adjust_shift) {
 					/* Adjust by scaling io_size */
 					tmp_io_size = io_size + (io_size / (1 << adjust_shift));
-					/* If size is too small, we get stuck at 1 */
+					/*
+					 * If size is too small, we get
+					 * stuck at 1
+					 */
 					if (tmp_io_size < 1)
 						tmp_io_size = 1;
 				} else {
-					/* Adjust by comparing differences in rates */
-					tmp_io_size = io_size + (data_rate - current_rate) * const_delay;
+					/*
+					 * Adjust by comparing differences
+					 * in rates
+					*/
+					tmp_io_size = io_size +
+						(data_rate - current_rate) *
+						const_delay;
 				}
 
 				/* Need to grow buffer? */
-				if ((tmp_io_size > io_size) && (tmp_io_size < IO_SIZE_MAX)) {
+				if ((tmp_io_size > io_size) &&
+				    (tmp_io_size < IO_SIZE_MAX)) {
 					stats.reallocs++;
 					tmp = realloc(buffer, BUF_SIZE(tmp_io_size));
 					if (tmp) {
@@ -1270,17 +1295,27 @@ redo_write:
 
 				if (adjust_shift) {
 					/* Adjust by scaling io_size */
-					tmp_io_size = io_size - (io_size / (1 << adjust_shift));
-					/* If size is too small, we get stuck at 1 */
+					tmp_io_size = io_size -
+						(io_size / (1 << adjust_shift));
+					/*
+					 * If size is too small, we get
+					 * stuck at 1
+					 */
 					if (tmp_io_size < 1)
 						tmp_io_size = 1;
 				} else {
-					/* Adjust by comparing differences in rates */
-					tmp_io_size = io_size + (data_rate - current_rate) * const_delay;
+					/*
+					 * Adjust by comparing differences
+					 * in rates
+					 */
+					tmp_io_size = io_size +
+						(data_rate - current_rate) *
+						const_delay;
 				}
 
 				/* Need to grow buffer? */
-				if ((tmp_io_size > io_size) && (tmp_io_size < IO_SIZE_MAX)) {
+				if ((tmp_io_size > io_size) &&
+				    (tmp_io_size < IO_SIZE_MAX)) {
 					stats.reallocs++;
 					tmp = realloc(buffer, BUF_SIZE(tmp_io_size));
 					if (tmp) {
@@ -1320,8 +1355,12 @@ redo_write:
 				/* Progress % and ETA estimates */
 				double secs = secs_now - secs_start;
 				if (progress_size) {
-					double percent = 100.0 * (double)progress_size / (double)stats.total_bytes;
-					double alpha = secs * (double)progress_size / (double)stats.total_bytes;
+					double percent = 100.0 *
+						(double)progress_size /
+						(double)stats.total_bytes;
+					double alpha = secs *
+						(double)progress_size /
+						(double)stats.total_bytes;
 					double secs_left = alpha - secs;
 
 					fprintf(stderr,"Rate: %s/S, "
@@ -1350,7 +1389,8 @@ redo_write:
 			secs_last = secs_now;
 		}
 #if DEBUG_RATE
-		fprintf(stderr, "rate-post: %.2f delay: %.2f io_size: %.3f\n", current_rate, delay, io_size);
+		fprintf(stderr, "rate-post: %.2f delay: %.2f io_size: %.3f\n",
+			current_rate, delay, io_size);
 #endif
 		/* Timed run, if we timed out then stop */
 		if ((opt_flags & OPT_TIMED_RUN) &&
