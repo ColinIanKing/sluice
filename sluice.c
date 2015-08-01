@@ -276,7 +276,7 @@ static inline void stats_init(stats_t *const stats)
  *  secs_to_str()
  *	report seconds in different units.
  */
-static char *secs_to_str(const double secs)
+static const char *secs_to_str(const double secs)
 {
 	static char buf[64];
 	int i;
@@ -327,7 +327,7 @@ static void size_to_str(
  *  double_to_str()
  *	convert double size in bytes to string
  */
-static char *double_to_str(const double val)
+static const char *double_to_str(const double val)
 {
 	static char buf[64];
 
