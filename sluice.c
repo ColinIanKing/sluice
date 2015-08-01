@@ -115,9 +115,9 @@
 #define DELAY_GET_ACTION(n, action)	((1 << n) & action)
 
 typedef struct {
+	double	divisor;			/* delay divisor */
 	uint8_t	mode;				/* User specified mode */
 	uint8_t	action;				/* action bit map */
-	double	divisor;			/* delay divisor */
 } delay_info_t;
 
 /*
