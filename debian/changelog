@@ -1,3 +1,12 @@
+sluice (0.02.01-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Update debian/control debhelper version to 9 or above
+  * Update debian compat to 9
+  * Fix ordering of -D flag options (LP: #1492832)
+
+ -- Colin King <colin.king@canonical.com>  Sun, 6 Sep 2015 20:42:00 +0100
+
 sluice (0.02.00-1) unstable; urgency=medium
 
   * Makefile: bump version to 0.02.00
