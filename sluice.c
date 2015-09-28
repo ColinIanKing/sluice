@@ -828,7 +828,7 @@ int main(int argc, char **argv)
 		goto tidy;
 	}
 	if (!(opt_flags & (OPT_GOT_RATE | OPT_NO_RATE_CONTROL))) {
-		fprintf(stderr, "Must specify data rate with -r option.\n");
+		fprintf(stderr, "Must specify data rate with -r option (or use -n for no rate control).\n");
 		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
