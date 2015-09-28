@@ -49,7 +49,7 @@
 #define DELAY_SHIFT_MAX		(16)		/* Max shift, see -s */
 
 #define IO_SIZE_MIN		(1)		/* Min io buffer size, see -i */
-#define IO_SIZE_MAX		(MB * 64)	/* Max io buffer size, see -i */
+#define IO_SIZE_MAX		(1ULL * GB)	/* Max io buffer size, see -i */
 
 #define DELAY_MIN		(0.01)		/* Min delay time, see -c */
 #define DELAY_MAX		(10.00)		/* Max delay time, see -c */
@@ -899,9 +899,9 @@ int main(int argc, char **argv)
 				if (io_size < IO_SIZE_MIN)
 					io_size = IO_SIZE_MIN;
 				if (io_size > IO_SIZE_MAX) {
-					fprintf(stderr, "Rate too high, maximum allowed: %s/sec.\n",
+					fprintf(stderr, "Rate too high for the buffer size, maximum allowed: %s/sec.\n",
 						double_to_str((double)IO_SIZE_MAX * 32.0));
-					fprintf(stderr, "Use -i to explicitly set buffer size.\n");
+					fprintf(stderr, "Use -i to explicitly set a larger buffer size.\n");
 					ret = EXIT_BAD_OPTION;
 					goto tidy;
 				}
