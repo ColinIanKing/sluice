@@ -591,7 +591,7 @@ static void show_usage(void)
 	printf("  -o         shrink read/write buffer to avoid overrun.\n");
 	printf("  -O file    short cut for -dt file; output to a file.\n");
 	printf("  -p         enable verbose mode with progress stats.\n");
-	printf("  -P pidfile save process ID intp file pidfile.\n");
+	printf("  -P pidfile save process ID into file pidfile.\n");
 	printf("  -r rate    set rate (in bytes per second).\n");
 	printf("  -R	     ignore stdin, read from %s.\n", dev_urandom);
 	printf("  -s shift   controls delay or buffer size adjustment.\n");
