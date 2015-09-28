@@ -476,13 +476,13 @@ static uint64_t get_uint64(const char *const str, size_t *const len)
  *  get_double()
  *	get a double value
  */
-static double get_double(const char *const str, size_t *const len)
+static double get_double(const char *const str, char **endptr, size_t *const len)
 {
 	double val;
 	*len = strlen(str);
 
 	errno = 0;
-	val = strtod(str, NULL);
+	val = strtod(str, endptr);
 	if (errno) {
 		fprintf(stderr, "Invalid value %s.\n", str);
 		exit(EXIT_BAD_OPTION);
@@ -507,11 +507,23 @@ static double get_double_scale(
 	double val;
 	size_t len = strlen(str);
 	int i;
-	char ch;
+	char ch, *endptr;
 
-	val = get_double(str, &len);
-	len--;
-	ch = str[len];
+	endptr = NULL;
+	val = get_double(str, &endptr, &len);
+
+	if (!endptr)
+		return val;
+
+	ch = *endptr;
+	if (!ch)
+		return val;
+
+	if (*(endptr + 1)) {
+		fprintf(stderr, "Expecting 1 character size specifier, got '%s'.\n",
+			endptr);
+		exit(EXIT_BAD_OPTION);
+	}
 
 	if (val < 0.0) {
 		fprintf(stderr, "Value %s cannot be negative\n", str);
@@ -527,7 +539,7 @@ static double get_double_scale(
 			return val * scales[i].scale;
 	}
 
-	fprintf(stderr, "Illegal %s specifier '%c'\n", msg, str[len]);
+	fprintf(stderr, "Illegal %s specifier '%c'\n", msg, *endptr);
 	exit(EXIT_BAD_OPTION);
 }
 
