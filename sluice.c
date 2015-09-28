@@ -39,7 +39,9 @@
 
 #define KB			(1024ULL)
 #define MB			(KB * KB)
-#define GB			(KB * KB * KB)
+#define GB			(KB * MB)
+#define TB			(KB * GB)
+#define PB			(KB * TB)
 
 #define UNDERRUN_MAX		(100)		/* Max underruns before warning, see -w */
 #define UNDERRUN_ADJUST_MAX	(1)		/* Underruns before adjusting rate */
@@ -767,6 +769,10 @@ int main(int argc, char **argv)
 			break;
 		case 'r':
 			data_rate = get_double_byte(optarg);
+			if (data_rate > 1.0 * PB) {
+				fprintf(stderr, "Data rate too high.\n");
+				exit(EXIT_BAD_OPTION);
+			}
 			opt_flags |= OPT_GOT_RATE;
 			break;
 		case 'R':
@@ -911,11 +917,14 @@ int main(int argc, char **argv)
 				if (io_size < IO_SIZE_MIN)
 					io_size = IO_SIZE_MIN;
 				if (io_size > IO_SIZE_MAX) {
+					io_size = IO_SIZE_MAX;
+					/*
 					fprintf(stderr, "Rate too high for the buffer size, maximum allowed: %s/sec.\n",
 						double_to_str((double)IO_SIZE_MAX * 32.0));
 					fprintf(stderr, "Use -i to explicitly set a larger buffer size.\n");
 					ret = EXIT_BAD_OPTION;
 					goto tidy;
+					*/
 				}
 			}
 		}
