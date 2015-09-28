@@ -514,7 +514,7 @@ static double get_double_scale(
 	ch = str[len];
 
 	if (val < 0.0) {
-		printf("Value %s cannot be negative\n", str);
+		fprintf(stderr, "Value %s cannot be negative\n", str);
 		exit(EXIT_BAD_OPTION);
 	}
 
@@ -527,7 +527,7 @@ static double get_double_scale(
 			return val * scales[i].scale;
 	}
 
-	printf("Illegal %s specifier %c\n", msg, str[len]);
+	fprintf(stderr, "Illegal %s specifier '%c'\n", msg, str[len]);
 	exit(EXIT_BAD_OPTION);
 }
 
