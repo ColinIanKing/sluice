@@ -1,3 +1,18 @@
+sluice (0.02.02-1) unstable; urgency=medium
+
+  * Various minor fixes (LP: #1500587)
+  * Makefile: bump version
+  * Update copyright, move to GPL-3
+  * Add upper rate limit, of 1PB per second.
+  * Improve size specifier checking on double float parser
+  * Fix two error messages that were printing to stdout and not stderr
+  * Fix typo, "infp" -> "into"
+  * Add more help if user does not specify -r option
+  * Increase default IO size buffer maximum
+  * Correct -d help info, should be disregard output. not input
+
+ -- Colin King <colin.king@canonical.com>  Mon, 28 Sep 2015 20:56:00 +0100
+
 sluice (0.02.01-1) unstable; urgency=medium
 
   * Makefile: bump version
