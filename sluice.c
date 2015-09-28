@@ -580,7 +580,7 @@ static void show_usage(void)
 	printf("Usage: %s [options]\n", app_name);
 	printf("  -a         append to file (-t, -O options only).\n");
 	printf("  -c delay   specify constant delay time (seconds).\n");
-	printf("  -d         discard input (no output).\n");
+	printf("  -d         discard output (no output).\n");
 	printf("  -D         delay mode.\n");
 	printf("  -e         skip read errors.\n");
 	printf("  -f freq    frequency of -v statistics.\n");
