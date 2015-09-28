@@ -344,7 +344,7 @@ static const char *double_to_str(const double val)
  */
 static void stats_info(const stats_t *stats)
 {
-	double secs = stats->time_end - stats->time_begin;
+	const double secs = stats->time_end - stats->time_begin;
 	double avg_wr_sz;
 	struct tms t;
 
