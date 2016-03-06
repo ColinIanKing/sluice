@@ -355,7 +355,7 @@ static int set_pipe_size(const int fd, const size_t sz)
  */
 static size_t get_max_pipe_size(void)
 {
-	int i, ret;
+	int i;
 	size_t prev_sz, sz, min, max;
 	FILE *fp;
 	const size_t page_size = get_pagesize();
@@ -365,7 +365,7 @@ static size_t get_max_pipe_size(void)
 	 */
 	fp = fopen("/proc/sys/fs/pipe-max-size", "r");
 	if (fp) {
-		ret = fscanf(fp, "%zu", &sz);
+		int ret = fscanf(fp, "%zu", &sz);
 		fclose(fp);
 		if (ret == 1 && !check_max_pipe_size(sz, page_size))
 			return sz;
