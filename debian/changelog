@@ -1,3 +1,14 @@
+sluice (0.02.03-1) unstable; urgency=medium
+
+  * Makefile bunp version
+  * reduce scope of variable ret
+  * Update date in manual
+  * Don't centre table in man page
+  * Add -x pipe transfer size option
+  * Update copyright year
+
+ -- Colin King <colin.king@canonical.com>  Sun, 6 Mar 2016 14:41:11 +0100
+
 sluice (0.02.02-1) unstable; urgency=medium
 
   * Various minor fixes (LP: #1500587)
