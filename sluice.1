@@ -154,6 +154,11 @@ print version information to standard out and exit successfully.
 .B \-w
 warn if a long burst of continuous data rate underrun occurs, the warning is issued just once.  To overcome the underrun increase the \-i read/write buffer size or use the \-u option to auto-expand the read/write buffer.  Too many underruns implies that too small a buffer or not enough CPU is available to keep up with the required data rate.
 .TP
+.B \-x size
+set pipe transfer size. If data is being piped into or out of sluice then this option allows one to specify the pipe size. Larger pipe sizes
+provied better throughput and less context switching; smaller pipe sizes are useful for low bandwidth rates where latency needs to be kept
+low.
+.TP
 .B \-z
 do not read from stdin, instead generate a stream of zeros (equivalent to
 reading from /dev/zero).

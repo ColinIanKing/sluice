@@ -18,6 +18,8 @@
  * Author Colin Ian King,  colin.king@canonical.com
  */
 
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -36,12 +38,19 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/times.h>
+#include <sys/fcntl.h>
 
 #define KB			(1024ULL)
 #define MB			(KB * KB)
 #define GB			(KB * MB)
 #define TB			(KB * GB)
 #define PB			(KB * TB)
+
+#if defined(__linux__)
+#define SET_XFER_SIZE		(1)
+#endif
+
+#define PAGE_4K			(4 * KB)
 
 #define UNDERRUN_MAX		(100)		/* Max underruns before warning, see -w */
 #define UNDERRUN_ADJUST_MAX	(1)		/* Underruns before adjusting rate */
@@ -87,6 +96,7 @@
 #define OPT_MAX_TRANS_SIZE	(0x00020000)	/* -m */
 #define OPT_SKIP_READ_ERRORS	(0x00040000)	/* -e */
 #define OPT_GOT_SHIFT		(0x00080000)	/* -s */
+#define OPT_PIPE_XFER_SIZE	(0x00100000)	/* -x */
 
 #define EXIT_BAD_OPTION		(1)
 #define EXIT_FILE_ERROR		(2)
@@ -273,6 +283,115 @@ static inline void stats_init(stats_t *const stats)
 	stats->rate_max = 0.0;
 	stats->rate_set = false;
 }
+
+#if defined(SET_XFER_SIZE)
+/*
+ *  get_pagesize()
+ *	get pagesize
+ */
+size_t get_pagesize(void)
+{
+#ifdef _SC_PAGESIZE
+	long sz;
+#endif
+	static size_t page_size = 0;
+
+	if (page_size > 0)
+		return page_size;
+
+#ifdef _SC_PAGESIZE
+        sz = sysconf(_SC_PAGESIZE);
+	page_size = (sz <= 0) ? PAGE_4K : (size_t)sz;
+#else
+        page_size = PAGE_4K;
+#endif
+
+	return page_size;
+}
+
+/*
+ *  check_max_pipe_size()
+ *	check if the given pipe size is allowed
+ */
+static int check_max_pipe_size(const size_t sz, const size_t page_size)
+{
+	int fds[2];
+
+	if (sz < page_size)
+		return -1;
+
+	if (pipe(fds) < 0)
+		return -1;
+
+	if (fcntl(fds[0], F_SETPIPE_SZ, sz) < 0)
+		return -1;
+
+	(void)close(fds[0]);
+	(void)close(fds[1]);
+	return 0;
+}
+
+/*
+ *  set_pipe_size()
+ *	set pipe size
+ */
+static int set_pipe_size(const int fd, const size_t sz)
+{
+	struct stat statbuf;
+
+	if (fstat(fd, &statbuf) < 0)
+		return -1;
+	if (!S_ISFIFO(statbuf.st_mode))
+		return -1;
+	if (fcntl(fd, F_SETPIPE_SZ, sz) < 0)
+		return -1;
+
+	return 0;
+}
+
+/*
+ *  get_max_pipe_size()
+ *	determine the maximim allowed pipe size
+ */
+static size_t get_max_pipe_size(void)
+{
+	int i, ret;
+	size_t prev_sz, sz, min, max;
+	FILE *fp;
+	const size_t page_size = get_pagesize();
+
+	/*
+	 *  Try and find maximum pipe size directly
+	 */
+	fp = fopen("/proc/sys/fs/pipe-max-size", "r");
+	if (fp) {
+		ret = fscanf(fp, "%zu", &sz);
+		fclose(fp);
+		if (ret == 1 && !check_max_pipe_size(sz, page_size))
+			return sz;
+	}
+
+	/*
+	 *  Need to find size by binary chop probing
+	 */
+	min = page_size;
+	max = INT_MAX;
+	prev_sz = 0;
+	for (i = 0; i < 64; i++) {
+		sz = min + (max - min) / 2;
+		if (prev_sz == sz)
+			return sz;
+		prev_sz = sz;
+		if (check_max_pipe_size(sz, page_size) == 0) {
+			min = sz;
+		} else {
+			max = sz;
+		}
+	}
+
+	return sz;
+}
+#endif
 
 /*
  *  secs_to_str()
@@ -616,6 +735,9 @@ static void show_usage(void)
 	printf("  -v         set verbose mode (to stderr).\n");
 	printf("  -V         print version information.\n");
 	printf("  -w         warn on data rate underrun.\n");
+#if defined(SET_XFER_SIZE)
+	printf("  -x size    set pipe transfer size.\n");
+#endif
 	printf("  -z         ignore stdin, generate zeros.\n");
 }
 
@@ -688,6 +810,9 @@ int main(int argc, char **argv)
 	uint64_t adjust_shift = 0;	/* -s adjustment scaling shift */
 	uint64_t timed_run = 0;		/* -T timed run duration */
 	uint64_t delay_mode = DELAY_R_W_D; /* read, write then delay */
+#if defined(SET_XFER_SIZE)
+	uint64_t xfer_size = 0;		/* Pipe transfer size */
+#endif
 
 	off_t progress_size = 0;
 
@@ -696,6 +821,10 @@ int main(int argc, char **argv)
 	int fdin = -1, fdout, fdtee = -1;
 	int underruns = 0, overruns = 0, warnings = 0;
 	int ret = EXIT_SUCCESS;
+
+#if defined(SET_XFER_SIZE)
+	size_t min_xfer_size, max_xfer_size;
+#endif
 
 	bool eof = false;		/* EOF on input */
 
@@ -707,7 +836,7 @@ int main(int argc, char **argv)
 
 	for (;;) {
 		const int c = getopt(argc, argv,
-			"ar:h?i:vm:wudot:f:zRs:c:O:SnT:I:VpeD:P:");
+			"ar:h?i:vm:wudot:f:zRs:c:O:SnT:I:VpeD:P:x:");
 		size_t len;
 
 		if (c == -1)
@@ -806,6 +935,25 @@ int main(int argc, char **argv)
 		case 'w':
 			opt_flags |= OPT_WARNING;
 			break;
+#if defined(SET_XFER_SIZE)
+		case 'x':
+			opt_flags |= OPT_PIPE_XFER_SIZE;
+			xfer_size = (double)get_uint64_byte(optarg);
+			min_xfer_size = get_pagesize();
+			max_xfer_size = get_max_pipe_size();
+			if ((xfer_size < min_xfer_size) ||
+			    (xfer_size > max_xfer_size)) {
+				fprintf(stderr, "-x size must be in the range %zu to %zu\n",
+					min_xfer_size, max_xfer_size);
+				exit(EXIT_FAILURE);
+			}
+			break;
+#else
+		case 'x':
+			fprintf(stderr, "-x option not available on this platform\n");
+			exit(EXIT_FAILURE);
+			break;
+#endif
 		case 'z':
 			opt_flags |= OPT_ZERO;
 			break;
@@ -1014,6 +1162,13 @@ int main(int argc, char **argv)
 	} else {
 		delay = io_size * 1000000.0 / (double)data_rate;
 	}
+
+#if defined(SET_XFER_SIZE)
+	if (opt_flags & OPT_PIPE_XFER_SIZE) {
+		(void)set_pipe_size(fdin, xfer_size);
+		(void)set_pipe_size(fdout, xfer_size);
+	}
+#endif
 
 #if DEBUG_SETUP
 	fprintf(stderr, "io_size:         %.0f\n", io_size);
