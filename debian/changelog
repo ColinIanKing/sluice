@@ -1,3 +1,10 @@
+sluice (0.02.04-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * debian/control: update Standards-Version to 3.9.8
+
+ -- Colin King <colin.king@canonical.com>  Thu, 5 May 2016 13:44:42 +0100
+
 sluice (0.02.03-1) unstable; urgency=medium
 
   * Makefile bunp version
