@@ -289,7 +289,7 @@ static inline void stats_init(stats_t *const stats)
  *  get_pagesize()
  *	get pagesize
  */
-size_t get_pagesize(void)
+static size_t get_pagesize(void)
 {
 #ifdef _SC_PAGESIZE
 	long sz;
