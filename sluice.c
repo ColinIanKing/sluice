@@ -126,6 +126,9 @@
 #define DELAY_SET_ACTION(a1, a2, a3)	((a1 << 0) | (a2 << 1) | (a3 << 2))
 #define DELAY_GET_ACTION(n, action)	((1 << n) & action)
 
+#define FLOAT_TINY		(0.0000001)
+#define FLOAT_CMP(a, b)		(fabs((a) - (b)) < FLOAT_TINY)
+
 typedef struct {
 	double	divisor;			/* delay divisor */
 	uint8_t	mode;				/* User specified mode */
@@ -527,9 +530,11 @@ static void stats_info(const stats_t *stats)
 		double total = stats->underruns +
 			       stats->overruns + stats->perfect;
 
-		fprintf(stderr, "Overruns:         %6.2f%%\n", total ?
+		fprintf(stderr, "Overruns:         %6.2f%%\n", 
+			FLOAT_CMP(total, 0.0) ?
 			100.0 * (double)stats->underruns / total : 0.0);
-		fprintf(stderr, "Underruns:        %6.2f%%\n", total ?
+		fprintf(stderr, "Underruns:        %6.2f%%\n",
+			FLOAT_CMP(total, 0.0) ?
 			100.0 * (double)stats->overruns / total : 0.0);
 
 		fprintf(stderr, "\nDrift from target rate: (%%)\n");
