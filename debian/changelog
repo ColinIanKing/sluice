@@ -1,3 +1,14 @@
+sluice (0.02.05-1) unstable; urgency=medium
+
+  * Add build hardening flags
+  * Makefile: bump version
+  * Use build-in popcount to count bits
+  * Allow float comparisons a little bit of slop
+  * Make get_pagesize helper static
+  * Makefile: add PEDANTIC flags
+
+ -- Colin King <colin.king@canonical.com>  Mon, 7 Nov 2016 13:51:11 +0100
+
 sluice (0.02.04-1) unstable; urgency=medium
 
   * Makefile: bump version
