@@ -220,11 +220,15 @@ static const scale_t second_scales[] = {
  */
 static inline unsigned int count_bits(const unsigned int val)
 {
+#if defined(__GNUC__)
+	return __builtin_popcount(val);
+#else
 	register unsigned int c, n = val;
 
 	for (c = 0; n; c++)
 		n &= n - 1;
 	return c;
+#endif
 }
 
 /*
