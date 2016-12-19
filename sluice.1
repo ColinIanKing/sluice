@@ -115,7 +115,7 @@ can specify the rate in Kilobytes/sec, Megabytes/sec, Gigabytes/sec and Terabyte
 do not read from stdin, instead read random data from /dev/urandom.
 .TP
 .B \-s shift
-modify the rate adjustment shift. This is a data rate tuning scaling factor used by the \-r, \-c, \-o and -\u options.
+modify the rate adjustment shift. This is a data rate tuning scaling factor used by the \-r, \-c, \-o and \-u options.
 .br
 
 For the \-r option, the delay between each write is controlled by modifying the previous delay by adding or subtracting the previous delay right shifted by this shift value.  The larger the shift value the longer it takes to adjust up/down to the specified rate.  The smaller the shift value the quicker it takes to reach the optimal delay, however, this can result in a highly fluctuating rates at the the beginning because the delay varies by a large amount causing large overruns and underruns.  A shift value of 3 works well for most fast rates.
