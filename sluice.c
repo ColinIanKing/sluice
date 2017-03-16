@@ -373,7 +373,7 @@ static size_t get_max_pipe_size(void)
 	fp = fopen("/proc/sys/fs/pipe-max-size", "r");
 	if (fp) {
 		int ret = fscanf(fp, "%zu", &sz);
-		fclose(fp);
+		(void)fclose(fp);
 		if (ret == 1 && !check_max_pipe_size(sz, page_size))
 			return sz;
 	}
