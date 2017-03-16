@@ -374,7 +374,7 @@ static size_t get_max_pipe_size(void)
 	if (fp) {
 		int ret = fscanf(fp, "%zu", &sz);
 		(void)fclose(fp);
-		if (ret == 1 && !check_max_pipe_size(sz, page_size))
+		if ((ret == 1) && !check_max_pipe_size(sz, page_size))
 			return sz;
 	}
 
@@ -660,7 +660,7 @@ static double get_double_scale(
 		exit(EXIT_BAD_OPTION);
 	}
 
-	if (isdigit(ch) || ch == '.')
+	if (isdigit(ch) || (ch == '.'))
 		return val;
 
 	ch = tolower(ch);
@@ -1036,7 +1036,7 @@ int main(int argc, char **argv)
 		goto tidy;
 	}
 	if ((opt_flags & OPT_GOT_CONST_DELAY) &&
-	    (const_delay < DELAY_MIN || const_delay > DELAY_MAX)) {
+	    ((const_delay < DELAY_MIN) || (const_delay > DELAY_MAX))) {
 		fprintf(stderr, "Delay time must be %.2f .. %.2f seconds.\n",
 			DELAY_MIN, DELAY_MAX);
 		ret = EXIT_BAD_OPTION;
