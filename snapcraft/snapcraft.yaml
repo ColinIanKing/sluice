@@ -1,0 +1,20 @@
+name: sluice
+version: 0.02.06-20170425-189-bc33e23
+summary: rate limiting data piping tool
+description: Sluice reads from standard input and write to standard output at a specified data rate.  This can be useful for benchmarking and exercising I/O streaming at desired throughput rates.
+confinement: strict
+type: app
+grade: stable
+
+parts:
+    sluice:
+        plugin: make
+        source: git://kernel.ubuntu.com/cking/sluice
+        build-packages:
+            - gcc
+            - make
+
+apps:
+    sluice:
+        command: usr/bin/sluice
+
