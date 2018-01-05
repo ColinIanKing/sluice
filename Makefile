@@ -41,7 +41,7 @@ sluice.1.gz: sluice.1
 dist:
 	rm -rf sluice-$(VERSION)
 	mkdir sluice-$(VERSION)
-	cp -rp Makefile sluice.c sluice.1 COPYING sluice-$(VERSION)
+	cp -rp Makefile sluice.c sluice.1 COPYING snapcraft sluice-$(VERSION)
 	tar -zcf sluice-$(VERSION).tar.gz sluice-$(VERSION)
 	rm -rf sluice-$(VERSION)
 
