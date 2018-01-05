@@ -1,3 +1,14 @@
+sluice (0.02.07-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * debian/control: update Standards-Version to 4.1.2
+  * update copyright year
+  * Add snapcraft
+  * Add extra parentheses for clarity
+  * voidify fclose()
+
+ -- Colin King <colin.king@canonical.com>  Fri, 5 Jan 2018 00:47:11 +0000
+
 sluice (0.02.06-1) unstable; urgency=medium
 
   * Makefile: bump minor version
