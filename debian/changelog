@@ -1,6 +1,7 @@
 sluice (0.02.07-1) unstable; urgency=medium
 
   * Makefile: bump version
+  * Makefile: add snapcraft directory to make dist rule
   * debian/control: update Standards-Version to 4.1.2
   * update copyright year
   * Add snapcraft
