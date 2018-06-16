@@ -431,7 +431,7 @@ static void size_to_str(
 	double v = val;
 	int i;
 
-	static char *sizes[] = {
+	static const char *const sizes[] = {
 		"B ",	/* Bytes */
 		"KB",	/* Kilobytes */
 		"MB",	/* Megabytes */
