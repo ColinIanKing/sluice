@@ -280,7 +280,7 @@ static inline void stats_init(stats_t *const stats)
 	stats->perfect = 0;
 	stats->io_size_min = 0;
 	stats->io_size_max = 0;
-	memset(&stats->drift, 0, sizeof(stats->drift));
+	(void)memset(&stats->drift, 0, sizeof(stats->drift));
 	stats->drift_total = 0;
 	stats->time_begin = 0.0;
 	stats->time_end = 0.0;
@@ -312,7 +312,6 @@ static size_t get_pagesize(void)
 #else
         page_size = PAGE_4K;
 #endif
-
 	return page_size;
 }
 
@@ -373,6 +372,7 @@ static size_t get_max_pipe_size(void)
 	fp = fopen("/proc/sys/fs/pipe-max-size", "r");
 	if (fp) {
 		int ret = fscanf(fp, "%zu", &sz);
+
 		(void)fclose(fp);
 		if ((ret == 1) && !check_max_pipe_size(sz, page_size))
 			return sz;
@@ -413,7 +413,7 @@ static const char *secs_to_str(const double secs)
 		if (secs <= second_scales[i + 1].scale)
 			break;
 	}
-	snprintf(buf, sizeof(buf), "%.2f %c",
+	(void)snprintf(buf, sizeof(buf), "%.2f %c",
 		secs / second_scales[i].scale, second_scales[i].ch);
 	return buf;
 }
@@ -448,7 +448,7 @@ static void size_to_str(
 			break;
 	}
 
-	snprintf(buf, buflen, fmt, v, sizes[i]);
+	(void)snprintf(buf, buflen, fmt, v, sizes[i]);
 }
 
 /*
@@ -475,52 +475,52 @@ static void stats_info(const stats_t *stats)
 	struct tms t;
 
 	if (secs <= 0.0)  {
-		fprintf(stderr, "Cannot compute statistics\n");
+		(void)fprintf(stderr, "Cannot compute statistics\n");
 		return;
 	}
 	avg_wr_sz = stats->writes ?
 		stats->buf_size_total / stats->writes : 0.0;
-	fprintf(stderr, "Data:             %s\n",
+	(void)fprintf(stderr, "Data:             %s\n",
 		double_to_str((double)stats->total_bytes));
-	fprintf(stderr, "Reads:            %" PRIu64 "\n",
+	(void)fprintf(stderr, "Reads:            %" PRIu64 "\n",
 		stats->reads);
-	fprintf(stderr, "Writes:           %" PRIu64 "\n",
+	(void)fprintf(stderr, "Writes:           %" PRIu64 "\n",
 		stats->writes);
-	fprintf(stderr, "Avg. Write Size:  %s\n",
+	(void)fprintf(stderr, "Avg. Write Size:  %s\n",
 		double_to_str(avg_wr_sz));
-	fprintf(stderr, "Duration:         %s\n",
+	(void)fprintf(stderr, "Duration:         %s\n",
 		secs_to_str(secs));
-	fprintf(stderr, "Delays:           %" PRIu64 "\n",
+	(void)fprintf(stderr, "Delays:           %" PRIu64 "\n",
 		stats->delays);
-	fprintf(stderr, "Buffer reallocs:  %" PRIu64 "\n",
+	(void)fprintf(stderr, "Buffer reallocs:  %" PRIu64 "\n",
 		stats->reallocs);
-	fprintf(stderr, "\n");
+	(void)fprintf(stderr, "\n");
 	if (!(opt_flags & OPT_NO_RATE_CONTROL)) {
-		fprintf(stderr, "Target rate:      %s/s\n",
+		(void)fprintf(stderr, "Target rate:      %s/s\n",
 			double_to_str(stats->target_rate));
 	}
-	fprintf(stderr, "Average rate:     %s/s\n",
+	(void)fprintf(stderr, "Average rate:     %s/s\n",
 		double_to_str((double)stats->total_bytes / secs));
-	fprintf(stderr, "Minimum rate:     %s/s\n",
+	(void)fprintf(stderr, "Minimum rate:     %s/s\n",
 		double_to_str(stats->rate_min));
-	fprintf(stderr, "Maximum rate:     %s/s\n",
+	(void)fprintf(stderr, "Maximum rate:     %s/s\n",
 		double_to_str(stats->rate_max));
-	fprintf(stderr, "Minimum buffer:   %s\n",
+	(void)fprintf(stderr, "Minimum buffer:   %s\n",
 		double_to_str((double)stats->io_size_min));
-	fprintf(stderr, "Maximum buffer:   %s\n",
+	(void)fprintf(stderr, "Maximum buffer:   %s\n",
 		double_to_str((double)stats->io_size_max));
 	if (times(&t) != (clock_t)-1) {
 		/* CPU utilitation stats, if available */
 		long int ticks_per_sec;
 
 		if ((ticks_per_sec = sysconf(_SC_CLK_TCK)) > 0) {
-			fprintf(stderr, "User time:        %s\n",
+			(void)fprintf(stderr, "User time:        %s\n",
 				secs_to_str((double)t.tms_utime /
 					(double)ticks_per_sec));
-			fprintf(stderr, "System time:      %s\n",
+			(void)fprintf(stderr, "System time:      %s\n",
 				secs_to_str((double)t.tms_stime /
 					(double)ticks_per_sec));
-			fprintf(stderr, "Total delay time: %s\n",
+			(void)fprintf(stderr, "Total delay time: %s\n",
 				secs_to_str(secs - (double)(t.tms_utime +
 					t.tms_stime) / (double)ticks_per_sec));
 		}
@@ -534,16 +534,16 @@ static void stats_info(const stats_t *stats)
 		double total = stats->underruns +
 			       stats->overruns + stats->perfect;
 
-		fprintf(stderr, "Overruns:         %6.2f%%\n", 
+		(void)fprintf(stderr, "Overruns:         %6.2f%%\n", 
 			FLOAT_CMP(total, 0.0) ?
 			100.0 * (double)stats->underruns / total : 0.0);
-		fprintf(stderr, "Underruns:        %6.2f%%\n",
+		(void)fprintf(stderr, "Underruns:        %6.2f%%\n",
 			FLOAT_CMP(total, 0.0) ?
 			100.0 * (double)stats->overruns / total : 0.0);
 
-		fprintf(stderr, "\nDrift from target rate: (%%)\n");
+		(void)fprintf(stderr, "\nDrift from target rate: (%%)\n");
 		for (i = 0; i < DRIFT_MAX; i++, percent *= 2.0) {
-			fprintf(stderr, "  %6.3f%% - %6.3f%%: %6.2f%%\n",
+			(void)fprintf(stderr, "  %6.3f%% - %6.3f%%: %6.2f%%\n",
 				last_percent, percent - 0.0001,
 				stats->drift_total ?
 					100.0 * (double)stats->drift[i] /
@@ -551,7 +551,7 @@ static void stats_info(const stats_t *stats)
 			last_percent = percent;
 			drift_sum += stats->drift[i];
 		}
-		fprintf(stderr, " >%6.3f%%          : %6.2f%%\n",
+		(void)fprintf(stderr, " >%6.3f%%          : %6.2f%%\n",
 			(double)last_percent,
 			stats->drift_total ?
 				100.0 - ((100.0 * (double)drift_sum) /
@@ -573,7 +573,7 @@ redo:
 		if (errno == EINTR)	/* should not occur */
 			goto redo;
 
-		fprintf(stderr, "gettimeofday error: errno=%d (%s).\n",
+		(void)fprintf(stderr, "gettimeofday error: errno=%d (%s).\n",
 			errno, strerror(errno));
 		return -1.0;
 	}
@@ -592,11 +592,11 @@ static uint64_t get_uint64(const char *const str, size_t *const len)
 	errno = 0;
 	val = (uint64_t)strtoull(str, NULL, 10);
 	if (errno) {
-		fprintf(stderr, "Invalid value %s.\n", str);
+		(void)fprintf(stderr, "Invalid value %s.\n", str);
 		exit(EXIT_BAD_OPTION);
 	}
 	if (*len == 0) {
-		fprintf(stderr, "Value %s is an invalid size.\n", str);
+		(void)fprintf(stderr, "Value %s is an invalid size.\n", str);
 		exit(EXIT_BAD_OPTION);
 	}
 	return val;
@@ -614,11 +614,11 @@ static double get_double(const char *const str, char **endptr, size_t *const len
 	errno = 0;
 	val = strtod(str, endptr);
 	if (errno) {
-		fprintf(stderr, "Invalid value %s.\n", str);
+		(void)fprintf(stderr, "Invalid value %s.\n", str);
 		exit(EXIT_BAD_OPTION);
 	}
 	if (*len == 0) {
-		fprintf(stderr, "Value %s is an invalid size.\n", str);
+		(void)fprintf(stderr, "Value %s is an invalid size.\n", str);
 		exit(EXIT_BAD_OPTION);
 	}
 	return val;
@@ -650,13 +650,13 @@ static double get_double_scale(
 		return val;
 
 	if (*(endptr + 1)) {
-		fprintf(stderr, "Expecting 1 character size specifier, got '%s'.\n",
+		(void)fprintf(stderr, "Expecting 1 character size specifier, got '%s'.\n",
 			endptr);
 		exit(EXIT_BAD_OPTION);
 	}
 
 	if (val < 0.0) {
-		fprintf(stderr, "Value %s cannot be negative\n", str);
+		(void)fprintf(stderr, "Value %s cannot be negative\n", str);
 		exit(EXIT_BAD_OPTION);
 	}
 
@@ -669,7 +669,7 @@ static double get_double_scale(
 			return val * scales[i].scale;
 	}
 
-	fprintf(stderr, "Illegal %s specifier '%c'\n", msg, *endptr);
+	(void)fprintf(stderr, "Illegal %s specifier '%c'\n", msg, *endptr);
 	exit(EXIT_BAD_OPTION);
 }
 
@@ -718,36 +718,36 @@ static inline uint64_t get_uint64_time(const char *const str)
  */
 static void show_usage(void)
 {
-	printf("%s, version %s\n\n", app_name, VERSION);
-	printf("Usage: %s [options]\n", app_name);
-	printf("  -a         append to file (-t, -O options only).\n");
-	printf("  -c delay   specify constant delay time (seconds).\n");
-	printf("  -d         discard output (no output).\n");
-	printf("  -D         delay mode.\n");
-	printf("  -e         skip read errors.\n");
-	printf("  -f freq    frequency of -v statistics.\n");
-	printf("  -h         print this help.\n");
-	printf("  -i size    set io read/write size in bytes.\n");
-	printf("  -m size    set maximum amount to process.\n");
-	printf("  -n         no rate controls, just copy data untouched.\n");
-	printf("  -o         shrink read/write buffer to avoid overrun.\n");
-	printf("  -O file    short cut for -dt file; output to a file.\n");
-	printf("  -p         enable verbose mode with progress stats.\n");
-	printf("  -P pidfile save process ID into file pidfile.\n");
-	printf("  -r rate    set rate (in bytes per second).\n");
-	printf("  -R	     ignore stdin, read from %s.\n", dev_urandom);
-	printf("  -s shift   controls delay or buffer size adjustment.\n");
-	printf("  -S         display statistics at end of stream to stderr.\n");
-	printf("  -t file    tee output to file.\n");
-	printf("  -T time    stop after a specified amount of time.\n");
-	printf("  -u         expand read/write buffer to avoid underrun.\n");
-	printf("  -v         set verbose mode (to stderr).\n");
-	printf("  -V         print version information.\n");
-	printf("  -w         warn on data rate underrun.\n");
+	(void)printf("%s, version %s\n\n", app_name, VERSION);
+	(void)printf("Usage: %s [options]\n", app_name);
+	(void)printf("  -a         append to file (-t, -O options only).\n");
+	(void)printf("  -c delay   specify constant delay time (seconds).\n");
+	(void)printf("  -d         discard output (no output).\n");
+	(void)printf("  -D         delay mode.\n");
+	(void)printf("  -e         skip read errors.\n");
+	(void)printf("  -f freq    frequency of -v statistics.\n");
+	(void)printf("  -h         print this help.\n");
+	(void)printf("  -i size    set io read/write size in bytes.\n");
+	(void)printf("  -m size    set maximum amount to process.\n");
+	(void)printf("  -n         no rate controls, just copy data untouched.\n");
+	(void)printf("  -o         shrink read/write buffer to avoid overrun.\n");
+	(void)printf("  -O file    short cut for -dt file; output to a file.\n");
+	(void)printf("  -p         enable verbose mode with progress stats.\n");
+	(void)printf("  -P pidfile save process ID into file pidfile.\n");
+	(void)printf("  -r rate    set rate (in bytes per second).\n");
+	(void)printf("  -R	     ignore stdin, read from %s.\n", dev_urandom);
+	(void)printf("  -s shift   controls delay or buffer size adjustment.\n");
+	(void)printf("  -S         display statistics at end of stream to stderr.\n");
+	(void)printf("  -t file    tee output to file.\n");
+	(void)printf("  -T time    stop after a specified amount of time.\n");
+	(void)printf("  -u         expand read/write buffer to avoid underrun.\n");
+	(void)printf("  -v         set verbose mode (to stderr).\n");
+	(void)printf("  -V         print version information.\n");
+	(void)printf("  -w         warn on data rate underrun.\n");
 #if defined(SET_XFER_SIZE)
-	printf("  -x size    set pipe transfer size.\n");
+	(void)printf("  -x size    set pipe transfer size.\n");
 #endif
-	printf("  -z         ignore stdin, generate zeros.\n");
+	(void)printf("  -z         ignore stdin, generate zeros.\n");
 }
 
 #define DELAY(delay, stats)						\
@@ -766,7 +766,7 @@ static void show_usage(void)
 				 * from usleep				\
 				 */					\
 			} else {					\
-				fprintf(stderr, "usleep error: "	\
+				(void)fprintf(stderr, "usleep error: "	\
 					"errno=%d (%s).\n",		\
 					errno, strerror(errno));	\
 				ret = EXIT_DELAY_ERROR;			\
@@ -784,7 +784,7 @@ static delay_info_t *get_delay_info(uint64_t delay_mode)
 	int i;
 
 	if (delay_mode > DELAY_MODE_MAX) {
-		fprintf(stderr, "Delay mode -D %" PRIu64
+		(void)fprintf(stderr, "Delay mode -D %" PRIu64
 			" is too large, range 0..%u.\n",
 			delay_mode, DELAY_MODE_MAX);
 		return NULL;
@@ -794,7 +794,7 @@ static delay_info_t *get_delay_info(uint64_t delay_mode)
 		if (delay_info[i].mode == delay_mode)
 			return &delay_info[i];
 	}
-	fprintf(stderr, "Cannot find delay mode %" PRIu64 ".\n",
+	(void)fprintf(stderr, "Cannot find delay mode %" PRIu64 ".\n",
 			delay_mode);
 	return NULL;
 }
@@ -908,7 +908,7 @@ int main(int argc, char **argv)
 		case 'r':
 			data_rate = get_double_byte(optarg);
 			if (data_rate > 1.0 * PB) {
-				fprintf(stderr, "Data rate too high.\n");
+				(void)fprintf(stderr, "Data rate too high.\n");
 				exit(EXIT_BAD_OPTION);
 			}
 			opt_flags |= OPT_GOT_RATE;
@@ -938,7 +938,7 @@ int main(int argc, char **argv)
 			break;
 		case 'V':
 			opt_flags |= OPT_VERSION;
-			printf("%s: %s\n", app_name, VERSION);
+			(void)printf("%s: %s\n", app_name, VERSION);
 			exit(EXIT_SUCCESS);
 			break;
 		case 'w':
@@ -952,14 +952,14 @@ int main(int argc, char **argv)
 			max_xfer_size = get_max_pipe_size();
 			if ((xfer_size < min_xfer_size) ||
 			    (xfer_size > max_xfer_size)) {
-				fprintf(stderr, "-x size must be in the range %zu to %zu\n",
+				(void)fprintf(stderr, "-x size must be in the range %zu to %zu\n",
 					min_xfer_size, max_xfer_size);
 				exit(EXIT_FAILURE);
 			}
 			break;
 #else
 		case 'x':
-			fprintf(stderr, "-x option not available on this platform\n");
+			(void)fprintf(stderr, "-x option not available on this platform\n");
 			exit(EXIT_FAILURE);
 			break;
 #endif
@@ -967,7 +967,7 @@ int main(int argc, char **argv)
 			opt_flags |= OPT_ZERO;
 			break;
 		case '?':
-			printf("Try '%s -h' for more information.\n", app_name);
+			(void)printf("Try '%s -h' for more information.\n", app_name);
 			exit(EXIT_BAD_OPTION);
 		default:
 			show_usage();
@@ -977,11 +977,12 @@ int main(int argc, char **argv)
 
 	if (pid_filename) {
 		FILE *pid_file = fopen(pid_filename, "w");
+
 		if (pid_file) {
-			fprintf(pid_file, "%d\n", getpid());
+			(void)fprintf(pid_file, "%d\n", getpid());
 			(void)fclose(pid_file);
 		} else {
-			fprintf(stderr, "Cannot create pid file '%s', errno=%d (%s).\n",
+			(void)fprintf(stderr, "Cannot create pid file '%s', errno=%d (%s).\n",
 				pid_filename, errno, strerror(errno));
 			ret = EXIT_FILE_ERROR;
 			goto tidy;
@@ -993,34 +994,34 @@ int main(int argc, char **argv)
 	}
 	if ((opt_flags & OPT_NO_RATE_CONTROL) &&
             (opt_flags & (OPT_GOT_CONST_DELAY | OPT_GOT_RATE | OPT_UNDERRUN | OPT_OVERRUN))) {
-		fprintf(stderr, "Cannot use -n option with -c, -r, -u or -o options.\n");
+		(void)fprintf(stderr, "Cannot use -n option with -c, -r, -u or -o options.\n");
 		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
 	if (!out_filename && (opt_flags & OPT_APPEND)) {
-		fprintf(stderr, "Must use -t filename when using the -a option.\n");
+		(void)fprintf(stderr, "Must use -t filename when using the -a option.\n");
 		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
 	if (!(opt_flags & (OPT_GOT_RATE | OPT_NO_RATE_CONTROL))) {
-		fprintf(stderr, "Must specify data rate with -r option (or use -n for no rate control).\n");
+		(void)fprintf(stderr, "Must specify data rate with -r option (or use -n for no rate control).\n");
 		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
 	if ((opt_flags & (OPT_GOT_IOSIZE | OPT_GOT_CONST_DELAY)) ==
 	    (OPT_GOT_IOSIZE | OPT_GOT_CONST_DELAY)) {
-		fprintf(stderr, "Cannot use both -i and -c options together.\n");
+		(void)fprintf(stderr, "Cannot use both -i and -c options together.\n");
 		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
 	if ((opt_flags & OPT_GOT_RATE) && (data_rate < DATA_RATE_MIN)) {
-		fprintf(stderr, "Rate value %.2f too low. Minimum allowed is %.2f bytes/sec.\n",
+		(void)fprintf(stderr, "Rate value %.2f too low. Minimum allowed is %.2f bytes/sec.\n",
 			data_rate, DATA_RATE_MIN);
 		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
 	if (freq < FREQ_MIN) {
-		fprintf(stderr, "Frequency %.3f too low. Minimum allowed is %.3f Hz.\n",
+		(void)fprintf(stderr, "Frequency %.3f too low. Minimum allowed is %.3f Hz.\n",
 			freq, FREQ_MIN);
 		ret = EXIT_BAD_OPTION;
 		goto tidy;
@@ -1030,14 +1031,14 @@ int main(int argc, char **argv)
 #else
 	if (adjust_shift > DELAY_SHIFT_MAX) {
 #endif
-		fprintf(stderr, "Delay shift must be %d .. %d.\n",
+		(void)fprintf(stderr, "Delay shift must be %d .. %d.\n",
 			DELAY_SHIFT_MIN, DELAY_SHIFT_MAX);
 		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
 	if ((opt_flags & OPT_GOT_CONST_DELAY) &&
 	    ((const_delay < DELAY_MIN) || (const_delay > DELAY_MAX))) {
-		fprintf(stderr, "Delay time must be %.2f .. %.2f seconds.\n",
+		(void)fprintf(stderr, "Delay time must be %.2f .. %.2f seconds.\n",
 			DELAY_MIN, DELAY_MAX);
 		ret = EXIT_BAD_OPTION;
 		goto tidy;
@@ -1050,12 +1051,12 @@ int main(int argc, char **argv)
 		if (opt_flags & OPT_GOT_CONST_DELAY) {
 			io_size = data_rate * const_delay;
 			if (io_size < IO_SIZE_MIN) {
-				fprintf(stderr, "Delay too small, internal buffer too small.\n");
+				(void)fprintf(stderr, "Delay too small, internal buffer too small.\n");
 				ret = EXIT_BAD_OPTION;
 				goto tidy;
 			}
 			if (io_size > IO_SIZE_MAX) {
-				fprintf(stderr, "Delay too large, internal buffer too big.\n");
+				(void)fprintf(stderr, "Delay too large, internal buffer too big.\n");
 				ret = EXIT_BAD_OPTION;
 				goto tidy;
 			}
@@ -1076,9 +1077,9 @@ int main(int argc, char **argv)
 				if (io_size > IO_SIZE_MAX) {
 					io_size = IO_SIZE_MAX;
 					/*
-					fprintf(stderr, "Rate too high for the buffer size, maximum allowed: %s/sec.\n",
+					(void)fprintf(stderr, "Rate too high for the buffer size, maximum allowed: %s/sec.\n",
 						double_to_str((double)IO_SIZE_MAX * 32.0));
-					fprintf(stderr, "Use -i to explicitly set a larger buffer size.\n");
+					(void)fprintf(stderr, "Use -i to explicitly set a larger buffer size.\n");
 					ret = EXIT_BAD_OPTION;
 					goto tidy;
 					*/
@@ -1091,22 +1092,22 @@ int main(int argc, char **argv)
 			io_size = (double)max_trans;
 
 	if ((io_size < IO_SIZE_MIN) || (io_size > IO_SIZE_MAX)) {
-		fprintf(stderr, "I/O buffer size too large, maximum allowed: %s.\n",
+		(void)fprintf(stderr, "I/O buffer size too large, maximum allowed: %s.\n",
 			double_to_str((double)IO_SIZE_MAX));
 		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
 	if ((buffer = malloc(BUF_SIZE(io_size))) == NULL) {
-		fprintf(stderr,"Cannot allocate buffer of %.0f bytes.\n",
+		(void)fprintf(stderr,"Cannot allocate buffer of %.0f bytes.\n",
 			io_size);
 		ret = EXIT_ALLOC_ERROR;
 		goto tidy;
 	}
 	if (opt_flags & OPT_ZERO)
-		memset(buffer, 0, (size_t)io_size);
+		(void)memset(buffer, 0, (size_t)io_size);
 
 	if (count_bits(opt_flags & (OPT_ZERO | OPT_URANDOM | OPT_INPUT_FILE)) > 1) {
-		fprintf(stderr, "Cannot use -z, -R or -I options together.\n");
+		(void)fprintf(stderr, "Cannot use -z, -R or -I options together.\n");
 		ret = EXIT_BAD_OPTION;
 		goto tidy;
 	}
@@ -1116,13 +1117,13 @@ int main(int argc, char **argv)
 
 		fdin = open(in_filename, O_RDONLY);
 		if (fdin < 0) {
-			fprintf(stderr, "open on %s failed: errno = %d (%s).\n",
+			(void)fprintf(stderr, "open on %s failed: errno = %d (%s).\n",
 				in_filename, errno, strerror(errno));
 			ret = EXIT_FILE_ERROR;
 			goto tidy;
 		}
 		if (fstat(fdin, &buf) < 0) {
-			fprintf(stderr, "fstat on file %s failed: errno = %d (%s).\n",
+			(void)fprintf(stderr, "fstat on file %s failed: errno = %d (%s).\n",
 				in_filename, errno, strerror(errno));
 			progress_size = 0;
 		} else {
@@ -1135,7 +1136,7 @@ int main(int argc, char **argv)
 	if (opt_flags & OPT_URANDOM) {
 		fdin = open(dev_urandom, O_RDONLY);
 		if (fdin < 0) {
-			fprintf(stderr, "Cannot open %s: errno=%d (%s).\n",
+			(void)fprintf(stderr, "Cannot open %s: errno=%d (%s).\n",
 				dev_urandom, errno, strerror(errno));
 			ret = EXIT_FILE_ERROR;
 			goto tidy;
@@ -1147,7 +1148,7 @@ int main(int argc, char **argv)
 		(void)umask(0077);
 		fdtee = open(out_filename, O_CREAT | open_flags | O_WRONLY, S_IRUSR | S_IWUSR);
 		if (fdtee < 0) {
-			fprintf(stderr, "open on %s failed: errno = %d (%s).\n",
+			(void)fprintf(stderr, "open on %s failed: errno = %d (%s).\n",
 				out_filename, errno, strerror(errno));
 			ret = EXIT_FILE_ERROR;
 			goto tidy;
@@ -1180,54 +1181,54 @@ int main(int argc, char **argv)
 #endif
 
 #if DEBUG_SETUP
-	fprintf(stderr, "io_size:         %.0f\n", io_size);
-	fprintf(stderr, "data_rate:       %f\n", data_rate);
-	fprintf(stderr, "const_delay:     %f\n", const_delay);
-	fprintf(stderr, "delay:           %f\n", delay);
-	fprintf(stderr, "progress_size:   %" PRIu64 "\n",
+	(void)fprintf(stderr, "io_size:         %.0f\n", io_size);
+	(void)fprintf(stderr, "data_rate:       %f\n", data_rate);
+	(void)fprintf(stderr, "const_delay:     %f\n", const_delay);
+	(void)fprintf(stderr, "delay:           %f\n", delay);
+	(void)fprintf(stderr, "progress_size:   %" PRIu64 "\n",
 		(uint64_t)progress_size);
-	fprintf(stderr, "max_trans:       %" PRIu64 "\n", max_trans);
-	fprintf(stderr, "shift:           %" PRIu64 "\n", adjust_shift);
+	(void)fprintf(stderr, "max_trans:       %" PRIu64 "\n", max_trans);
+	(void)fprintf(stderr, "shift:           %" PRIu64 "\n", adjust_shift);
 #endif
 	secs_last = secs_start;
 	stats.time_begin = secs_start;
 	stats.target_rate = data_rate;
 
-	memset(&new_action, 0, sizeof(new_action));
+	(void)memset(&new_action, 0, sizeof(new_action));
 	new_action.sa_handler = handle_sigint;
-	sigemptyset(&new_action.sa_mask);
+	(void)sigemptyset(&new_action.sa_mask);
 	new_action.sa_flags = 0;
 	if (sigaction(SIGINT, &new_action, NULL) < 0) {
-		fprintf(stderr, "Sigaction failed: errno=%d (%s).\n",
+		(void)fprintf(stderr, "Sigaction failed: errno=%d (%s).\n",
 			errno, strerror(errno));
 		ret = EXIT_SIGNAL_ERROR;
 		goto tidy;
 	}
 
-	memset(&new_action, 0, sizeof(new_action));
+	(void)memset(&new_action, 0, sizeof(new_action));
 	new_action.sa_handler = handle_siginfo;
-	sigemptyset(&new_action.sa_mask);
+	(void)sigemptyset(&new_action.sa_mask);
 	new_action.sa_flags = 0;
 	if (sigaction(SIGUSR1, &new_action, NULL) < 0) {
-		fprintf(stderr, "Sigaction failed: errno=%d (%s).\n",
+		(void)fprintf(stderr, "Sigaction failed: errno=%d (%s).\n",
 			errno, strerror(errno));
 		ret = EXIT_SIGNAL_ERROR;
 		goto tidy;
 	}
 #ifdef SIGINFO
 	if (sigaction(SIGINFO, &new_action, NULL) < 0) {
-		fprintf(stderr, "Sigaction failed: errno=%d (%s).\n",
+		(void)fprintf(stderr, "Sigaction failed: errno=%d (%s).\n",
 			errno, strerror(errno));
 		ret = EXIT_SIGNAL_ERROR;
 		goto tidy;
 	}
 #endif
-	memset(&new_action, 0, sizeof(new_action));
+	(void)memset(&new_action, 0, sizeof(new_action));
 	new_action.sa_handler = handle_sigusr2;
-	sigemptyset(&new_action.sa_mask);
+	(void)sigemptyset(&new_action.sa_mask);
 	new_action.sa_flags = 0;
 	if (sigaction(SIGUSR2, &new_action, NULL) < 0) {
-		fprintf(stderr, "Sigaction failed: errno=%d (%s).\n",
+		(void)fprintf(stderr, "Sigaction failed: errno=%d (%s).\n",
 			errno, strerror(errno));
 		ret = EXIT_SIGNAL_ERROR;
 		goto tidy;
@@ -1279,10 +1280,10 @@ int main(int argc, char **argv)
 					/* Ignore errors? */
 					if (opt_flags & OPT_SKIP_READ_ERRORS) {
 						/* Ensure block is empty */
-						memset(ptr, 0, sz);
+						(void)memset(ptr, 0, sz);
 						n = sz;
 					} else {
-						fprintf(stderr,"read error: errno=%d (%s).\n",
+						(void)fprintf(stderr,"read error: errno=%d (%s).\n",
 							errno, strerror(errno));
 						ret = EXIT_READ_ERROR;
 						goto tidy;
@@ -1308,7 +1309,7 @@ int main(int argc, char **argv)
 		stats.buf_size_total += inbufsize;
 		if (!(opt_flags & OPT_DISCARD_STDOUT)) {
 			if (write(fdout, buffer, (size_t)inbufsize) < 0) {
-				fprintf(stderr,"Write error: errno=%d (%s).\n",
+				(void)fprintf(stderr,"Write error: errno=%d (%s).\n",
 					errno, strerror(errno));
 				ret = EXIT_WRITE_ERROR;
 				goto tidy;
@@ -1325,7 +1326,7 @@ redo_write:
 					/* write needs re-doing */
 					goto redo_write;
 				} else {
-					fprintf(stderr, "write error: errno=%d (%s).\n",
+					(void)fprintf(stderr, "write error: errno=%d (%s).\n",
 						errno, strerror(errno));
 					ret = EXIT_WRITE_ERROR;
 					goto tidy;
@@ -1377,7 +1378,7 @@ redo_write:
 			}
 		}
 #if DEBUG_RATE
-		fprintf(stderr, "rate-pre : %.2f delay: %.2f io_size: %.3f\n",
+		(void)fprintf(stderr, "rate-pre : %.2f delay: %.2f io_size: %.3f\n",
 			current_rate, delay, io_size);
 #endif
 
@@ -1516,7 +1517,7 @@ redo_write:
 			/* Too many continuous underruns? */
 			if ((opt_flags & OPT_WARNING) &&
 			    (warnings > UNDERRUN_MAX)) {
-				fprintf(stderr, "Warning: data underrun, "
+				(void)fprintf(stderr, "Warning: data underrun, "
 					"use larger I/O size (-i option)\n");
 				opt_flags &= ~OPT_WARNING;
 			}
@@ -1548,13 +1549,13 @@ redo_write:
 						(double)stats.total_bytes;
 					double secs_left = alpha - secs;
 
-					fprintf(stderr,"Rate: %s/S, "
+					(void)fprintf(stderr,"Rate: %s/S, "
 						"Total: %s, Dur: %.1f S, %5.1f%% ETA: %s  \r",
 						current_rate_str, total_bytes_str, secs,
 						percent, secs_to_str(secs_left));
 				} else {
 					/* No size, avoid division by zero */
-					fprintf(stderr,"Rate: %s/S, "
+					(void)fprintf(stderr,"Rate: %s/S, "
 						"Total: %s, Dur: %.1f S, ??.?%% ETA: ?.? S  \r",
 						current_rate_str, total_bytes_str, secs);
 				}
@@ -1565,7 +1566,7 @@ redo_write:
 				size_to_str(io_size, "%7.1f %s",
 					io_size_str,
 					sizeof(io_size_str));
-				fprintf(stderr,"Rate: %s/S, Adj: %c, "
+				(void)fprintf(stderr,"Rate: %s/S, Adj: %c, "
 					"Total: %s, Dur: %.1f S, Buf: %s  \r",
 					current_rate_str, run, total_bytes_str,
 					secs_now - secs_start, io_size_str);
@@ -1574,7 +1575,7 @@ redo_write:
 			secs_last = secs_now;
 		}
 #if DEBUG_RATE
-		fprintf(stderr, "rate-post: %.2f delay: %.2f io_size: %.3f\n",
+		(void)fprintf(stderr, "rate-post: %.2f delay: %.2f io_size: %.3f\n",
 			current_rate, delay, io_size);
 #endif
 		/* Timed run, if we timed out then stop */
@@ -1588,7 +1589,7 @@ redo_write:
 
 finish:
 	if (opt_flags & OPT_VERBOSE)
-		fprintf(stderr, "%78s\r", "");
+		(void)fprintf(stderr, "%78s\r", "");
 
 	if (opt_flags & OPT_STATS) {
 		if ((stats.time_end = timeval_to_double()) < 0.0) {
