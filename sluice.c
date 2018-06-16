@@ -728,6 +728,7 @@ static void show_usage(void)
 	(void)printf("  -f freq    frequency of -v statistics.\n");
 	(void)printf("  -h         print this help.\n");
 	(void)printf("  -i size    set io read/write size in bytes.\n");
+	(void)printf("  -I file    read input from file.\n");
 	(void)printf("  -m size    set maximum amount to process.\n");
 	(void)printf("  -n         no rate controls, just copy data untouched.\n");
 	(void)printf("  -o         shrink read/write buffer to avoid overrun.\n");
