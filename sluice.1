@@ -109,7 +109,8 @@ write the process ID of sluice in file pidfile. The file is removed when sluice 
 .TP
 .B \-r rate
 specify the data rate in bytes per second. The K, M, G and T suffixes
-can specify the rate in Kilobytes/sec, Megabytes/sec, Gigabytes/sec and Terabytes/sec respectively. This option must always be provided except when the \-n option is used.
+can specify the rate in Kilobytes/sec, Megabytes/sec, Gigabytes/sec and Terabytes/sec respectively. This option must always be provided except when the \-n option is used.  A zero rate is equivalent to no rate control
+(same as \-n).
 .TP
 .B \-R
 do not read from stdin, instead read random data from /dev/urandom.
