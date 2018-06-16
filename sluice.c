@@ -143,7 +143,7 @@ typedef struct {
  *			write
  *	2		sleep on/off
  */
-static delay_info_t delay_info[] = {
+static const delay_info_t delay_info[] = {
 	{ 1.0, DELAY_R_W_D,	DELAY_SET_ACTION(DELAY_S, DELAY_S, DELAY_D) },
 	{ 1.0, DELAY_D_R_W,	DELAY_SET_ACTION(DELAY_D, DELAY_S, DELAY_S) },
 	{ 1.0, DELAY_R_D_W,     DELAY_SET_ACTION(DELAY_S, DELAY_D, DELAY_S) },
