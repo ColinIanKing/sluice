@@ -1,3 +1,19 @@
+sluice (0.02.08-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * fixup some constifications
+  * Make delay_info const
+  * Make -r 0 to be no rate control (same as -n)
+  * Add -I option to help
+  * debian/copyright: use secure URI
+  * debian/control: update debhelper version to >=11
+  * debian/control: remove empty last line
+  * debian/compat: update to 11
+  * constify sizes
+  * voidify function returns
+
+ -- Colin King <colin.king@canonical.com>  Sat, 16 Jun 2018 20:38:23 +0100
+
 sluice (0.02.07-1) unstable; urgency=medium
 
   * Makefile: bump version
