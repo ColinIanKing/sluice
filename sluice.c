@@ -780,7 +780,7 @@ static void show_usage(void)
 	if (DELAY_GET_ACTION(n, di->action))				\
 		DELAY(delay / di->divisor, stats);
 
-static delay_info_t *get_delay_info(uint64_t delay_mode)
+static const delay_info_t *get_delay_info(uint64_t delay_mode)
 {
 	int i;
 
@@ -840,7 +840,7 @@ int main(int argc, char **argv)
 
 	stats_t stats;			/* Data rate statistics */
 	struct sigaction new_action;
-	delay_info_t *di = NULL;
+	const delay_info_t *di = NULL;
 
 	stats_init(&stats);
 
