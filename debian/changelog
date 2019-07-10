@@ -1,3 +1,14 @@
+sluice (0.02.09-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Use DOUBLE_CMP to compare with zero
+  * Rename FLOAT_CMP to DOUBLE_CMP as it compares doubles
+  * Makefile: add .travis.yml to dist rule
+  * Update copyright year
+  * Add travis yaml file
+
+ -- Colin King <colin.king@canonical.com>  Wed, 10 Jul 2019 10:59:57 +0100
+
 sluice (0.02.08-1) unstable; urgency=medium
 
   * Makefile: bump version
