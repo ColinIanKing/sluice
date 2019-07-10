@@ -912,7 +912,7 @@ int main(int argc, char **argv)
 				(void)fprintf(stderr, "Data rate too high.\n");
 				exit(EXIT_BAD_OPTION);
 			}
-			if (data_rate == 0.0)
+			if (DOUBLE_CMP(data_rate, 0.0))
 				opt_flags |= OPT_NO_RATE_CONTROL;
 			else
 				opt_flags |= OPT_GOT_RATE;
