@@ -1,3 +1,13 @@
+sluice (0.02.10-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Makefile: rename snapcraft to snap in dist rule
+  * Debian: update to compat level 12
+  * snapcraft: use automatic versioning
+  * Rename snapcraft to snap
+
+ -- Colin King <colin.king@canonical.com>  Mon, 12 Aug 2019 17:04:11 +0100
+
 sluice (0.02.09-1) unstable; urgency=medium
 
   * Makefile: bump version
