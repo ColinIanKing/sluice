@@ -1,5 +1,7 @@
 name: sluice
-version: 0.02.06-20170425-189-bc33e23
+version: git
+version-script: |
+    echo $(git describe --tags)
 summary: rate limiting data piping tool
 description: Sluice reads from standard input and write to standard output at a specified data rate.  This can be useful for benchmarking and exercising I/O streaming at desired throughput rates.
 confinement: strict
