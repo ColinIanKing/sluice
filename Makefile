@@ -31,6 +31,7 @@ endif
 
 BINDIR=/usr/bin
 MANDIR=/usr/share/man/man1
+BASHDIR=/usr/share/bash-completion/completions
 
 sluice: sluice.o
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
@@ -42,7 +43,7 @@ dist:
 	rm -rf sluice-$(VERSION)
 	mkdir sluice-$(VERSION)
 	cp -rp Makefile sluice.c sluice.1 COPYING snap \
-		.travis.yml sluice-$(VERSION)
+		.travis.yml bash-completion sluice-$(VERSION)
 	tar -zcf sluice-$(VERSION).tar.gz sluice-$(VERSION)
 	rm -rf sluice-$(VERSION)
 
@@ -55,3 +56,5 @@ install: sluice sluice.1.gz
 	cp sluice ${DESTDIR}${BINDIR}
 	mkdir -p ${DESTDIR}${MANDIR}
 	cp sluice.1.gz ${DESTDIR}${MANDIR}
+	mkdir -p ${DESTDIR}${BASHDIR}
+	cp bash-completion/sluice ${DESTDIR}${BASHDIR}
