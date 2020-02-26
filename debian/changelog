@@ -1,3 +1,11 @@
+sluice (0.02.11-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Add bash completion script
+  * Update copyright to 2020
+
+ -- Colin King <colin.king@canonical.com>  Wed, 26 Feb 2020 16:49:25 +0000
+
 sluice (0.02.10-1) unstable; urgency=medium
 
   * Makefile: bump version
