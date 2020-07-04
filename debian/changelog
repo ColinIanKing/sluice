@@ -1,3 +1,10 @@
+sluice (0.02.12-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Debian/control: remove compat file, add Rules-Requires-Root no rule
+
+ -- Colin King <colin.king@canonical.com>  Sat, 4 Jul 2020 21:43:11 +0100
+
 sluice (0.02.11-1) unstable; urgency=medium
 
   * Makefile: bump version
