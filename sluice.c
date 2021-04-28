@@ -1116,7 +1116,7 @@ int main(int argc, char **argv)
 		goto tidy;
 	}
 
-	if (opt_flags & OPT_INPUT_FILE) {
+	if ((opt_flags & OPT_INPUT_FILE) && (in_filename != NULL)) {
 		struct stat buf;
 
 		fdin = open(in_filename, O_RDONLY);
