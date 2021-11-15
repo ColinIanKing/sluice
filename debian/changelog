@@ -1,3 +1,17 @@
+sluice (0.02.14-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * sluice.c: update copyright
+  * Makefile: update copyright
+  * Makefile: add README.md to dist rule
+  * manual: update date, author email and copyright
+  * debian/watch: update watch path for tarball, move to version 4
+  * debian/control: update author email address and project URL
+  * Add README.md
+  * snapcraft: update to core20
+
+ -- Colin Ian King <colin.i.king@gmail.com>  Mon, 15 Nov 2021 22:23:24 +0000
+
 sluice (0.02.13-1) unstable; urgency=medium
 
   * Makefile: bump version
