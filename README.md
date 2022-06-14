@@ -69,4 +69,16 @@ System time:     19.100 secs
 
 # Why so many tweakables?
 
-Sluice provides different ways to adjust the data rate for specific use-cases. The -i option allows one to specify the read/write size and hence the only the delay between writes can be used to control the data rate. Using the -o and -u options allows further adjustment of the write size to help reach the desired rate faster. The -s option allows sluice to add more control to the data rate adjustments. The delay time or buffer sizes are modified by the previous values right shifted by the -s shift value. The larger the shift value the smaller the modification, and hence the longer it will take to reach the desired data rate. The smaller the shift value the quicker it will take sluice to reach the desired data rate, however, it can cause large overruns or underrun oscillations which are not desirable. 
+Sluice provides different ways to adjust the data rate for specific
+use-cases. The -i option allows one to specify the read/write size and 
+hence the only the delay between writes can be used to control the data
+rate. Using the -o and -u options allows further adjustment of the write
+size to help reach the desired rate faster. 
+
+The -s option allows sluice to add more control to the data rate adjustments.
+The delay time or buffer sizes are modified by the previous values right
+shifted by the -s shift value. The larger the shift value the smaller the
+modification, and hence the longer it will take to reach the desired data
+rate. The smaller the shift value the quicker it will take sluice to reach
+the desired data rate, however, it can cause large overruns or underrun
+oscillations which are not desirable. 
