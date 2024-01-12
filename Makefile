@@ -43,7 +43,7 @@ sluice.1.gz: sluice.1
 dist:
 	rm -rf sluice-$(VERSION)
 	mkdir sluice-$(VERSION)
-	cp -rp Makefile sluice.c sluice.1 COPYING snap \
+	cp -rp Makefile sluice.c sluice.1 COPYING \
 		.travis.yml bash-completion README.md sluice-$(VERSION)
 	tar -Jcf sluice-$(VERSION).tar.xz sluice-$(VERSION)
 	rm -rf sluice-$(VERSION)
