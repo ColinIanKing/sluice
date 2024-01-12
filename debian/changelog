@@ -1,3 +1,16 @@
+sluice (0.02.16-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Manual: fix typos
+  * Manual: clean up indentation, fix incorrect copyright symbol
+  * Update copyright year
+  * debian/control: update standards version
+  * debian/rules: add missing hardening flags
+  * Makefile: remove snap from make dist rule
+  * Remove snapcraft
+
+ -- Colin Ian King <colin.i.king@gmail.com>  Fri, 12 Jan 2024 12:01:11 +0000
+
 sluice (0.02.15-1) unstable; urgency=medium
 
   * Makefile: bump version
