@@ -39,7 +39,8 @@ appends data to the file.
 enables a constant delay time (in seconds) between writes. This option adjusts
 the output buffer size to try and keep the data rate constant.  The output
 buffer size in this mode is initially set to the data rate \(mu the delay. 
-.br
+.RS
+.PP
 This option is mutually exclusive to the \-i option and implicitly
 enables the \-o overrun and \-u underrun buffer management options to
 dynamically re-size the read/write buffer to keep the data rate constant.
@@ -47,6 +48,7 @@ By default this adjusts the buffer based on the total amount of data
 transferred and the time to write this (equivalent to the \-s 0 turning mode).
 However, if the \-s shift value is greater than 0, then the new size is
 adjusted by the previous size right shifted by the shift value.
+.RE
 .TP
 .B \-d
 discard data, do not copy it to stdout. This makes sluice act as a data sink.
@@ -68,13 +70,15 @@ Mode	Delay strategy	Delay Duration
 4	Read, Delay, Write, Delay	2 \(mu 1/2 delay time
 5	Delay, Read, Delay, Write, Delay	3 \(mu 1/3 delay time
 .TE
-.br
+.RS
+.PP
 Note that modes 3 and 4 perform two delays each comprising of 1/2 the delay
 time and mode 5 performs 3 delays each comprising of 1/3 the delay time.
-.br
+.PP
 Modes 1, 3, 5 maybe considered as not entirely accurate in terms of the total
 run duration. In these modes an extraneous delay occurs before the final
 end-of-file empty read is performed.
+.RE
 .TP
 .B \-e
 ignore read errors. The failed read is replaced by zeros.
@@ -92,13 +96,14 @@ show help
 specify the read/write size in bytes. The K, M, G, T and P suffixes allow one
 to specify size in Kilobytes, Megabytes, Gigabytes, Terabytes and Petabytes
 respectively. This option is mutually exclusive to the \-c option.
-.br
+.RS
+.PP
 In this mode, the delays between writes are used to control the data rate.
 By default the delay is based on the total amount of data transferred and
 the time taken to write this. This is equivalent to the \-s 0 tuning mode.
 However, if the \-s shift value is greater than 0, then the new delay is
 adjusted by the previous delay right shifted by the shift value.
-.br
+.PP
 A special hybrid rate control mode can be invoked by also using the \-o
 overflow and \-u underflow options to also enable dynamic re-sizing of the
 read/write buffer. By default this adjusts the buffer based on the total
@@ -106,6 +111,7 @@ amount of data transferred and the time to write this (equivalent to
 the \-s 0 turning mode). However, if the \-s shift value is greater than 0,
 then the new size is adjusted by the previous size right shifted by the
 shift value.
+.RE
 .TP
 .B \-I file
 read input from file rather than from stdin.
@@ -151,7 +157,8 @@ do not read from stdin, instead read random data from /dev/urandom.
 .B \-s shift
 modify the rate adjustment shift. This is a data rate tuning scaling factor
 used by the \-r, \-c, \-o and \-u options.
-.br
+.RS
+.PP
 For the \-r option, the delay between each write is controlled by modifying
 the previous delay by adding or subtracting the previous delay right shifted
 by this shift value. The larger the shift value the longer it takes to
@@ -160,18 +167,19 @@ it takes to reach the optimal delay, however, this can result in a highly
 fluctuating rates at the the beginning because the delay varies by a large
 amount causing large overruns and underruns. A shift value of 3 works well
 for most fast rates.
-.br
+.PP
 For the \-c, \-o and \-u options, the size of the buffer is modified by
 adding or subtracting the previous size shifted by the shift value. Again,
 a shift value of 3 works well for most fast rates.
-.br
+.PP
 If the shift value is set to 0, then the shift rate adjustment tuning
 mechanism is explicitly turned off and data rates are adjusted based on
 the total amount of data transferred and the time to write this.
-.br
+.PP
 Small \-s shift values of 1 and 2 can cause rapid oscillations before
 the data rate damping fully kicks into action. The value of \-s 0 (the
 default) is recommended for accurate low-speed data transfers.
+.RE
 .TP
 .B \-S
 print various performance and buffering statistics to stderr when end of
@@ -195,15 +203,17 @@ See the \-s option for details of the size re-adjustment mechanism.
 .TP
 .B \-v
 write verbose statistics to stderr. By default, this will display the
-current data rate, the last data rate adjusment ('-' = underrun,
-'+' = overrun), total bytes transferred, duration and the current buffer
+current data rate, the last data rate adjusment ('\-' = underrun, '+'
+= overrun), total bytes transferred, duration and the current buffer
 size.
-.br
+.RS
+.PP
 With the \-p option, the progess statistics are displayed. This will
 display the current data rate, total bytes transferred, duration,
 percentage complete so far and the estimated time to completion. Note
 that the estimation is available using the \-I and \-m options and
 if the file size is non-zero.
+.RE
 .TP
 .B \-V
 print version information to standard out and exit successfully.
@@ -305,7 +315,7 @@ feedback and help from Kamal Mostafa.
 This manual page was written by Colin Ian King
 for the Ubuntu project (but may be used by others).
 .SH COPYRIGHT
-Copyright \(Aco 2014-2021 Canonical Ltd, Copyright \(co 2021-2024 Colin Ian King
+Copyright \(co 2014-2021 Canonical Ltd, Copyright \(co 2021-2024 Colin Ian King
 .br
 This is free software; see the source for copying conditions.  There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
