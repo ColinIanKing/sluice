@@ -97,6 +97,7 @@
 #define OPT_SKIP_READ_ERRORS	(0x00040000)	/* -e */
 #define OPT_GOT_SHIFT		(0x00080000)	/* -s */
 #define OPT_PIPE_XFER_SIZE	(0x00100000)	/* -x */
+#define OPT_FSYNC		(0x00200000)	/* -F */
 
 #define EXIT_BAD_OPTION		(1)
 #define EXIT_FILE_ERROR		(2)
@@ -713,6 +714,18 @@ static inline uint64_t get_uint64_time(const char *const str)
 }
 
 /*
+ *  fsync_data()
+ *	fsync to fd if *do_sync is true, disable sync'ing
+ *	on the fd if fsync fails (e.g. it's a tty or it
+ *	is a device/file that can be fsync'd to).
+ */
+static inline void fsync_data(const int fd, bool *do_sync)
+{
+	if ((*do_sync) && (fsync(fd) < 0))
+		*do_sync = false;
+}
+
+/*
  *  show_usage()
  *	show options
  */
@@ -726,6 +739,7 @@ static void show_usage(void)
 	(void)printf("  -D         delay mode.\n");
 	(void)printf("  -e         skip read errors.\n");
 	(void)printf("  -f freq    frequency of -v statistics.\n");
+	(void)printf("  -F         fsync file output on each write.\n");
 	(void)printf("  -h         print this help.\n");
 	(void)printf("  -i size    set io read/write size in bytes.\n");
 	(void)printf("  -I file    read input from file.\n");
@@ -831,6 +845,7 @@ int main(int argc, char **argv)
 	int fdin = -1, fdout, fdtee = -1;
 	int underruns = 0, overruns = 0, warnings = 0;
 	int ret = EXIT_SUCCESS;
+	bool fdout_sync = false, fdtee_sync = false;
 
 #if defined(SET_XFER_SIZE)
 	size_t min_xfer_size, max_xfer_size;
@@ -846,7 +861,7 @@ int main(int argc, char **argv)
 
 	for (;;) {
 		const int c = getopt(argc, argv,
-			"ar:h?i:vm:wudot:f:zRs:c:O:SnT:I:VpeD:P:x:");
+			"ar:h?i:vm:wudot:f:FzRs:c:O:SnT:I:VpeD:P:x:");
 		size_t len;
 
 		if (c == -1)
@@ -874,6 +889,9 @@ int main(int argc, char **argv)
 			break;
 		case 'f':
 			freq = atof(optarg);
+			break;
+		case 'F':
+			opt_flags |= OPT_FSYNC;
 			break;
 		case 'h':
 			show_usage();
@@ -1238,6 +1256,11 @@ int main(int argc, char **argv)
 		goto tidy;
 	}
 
+	if (opt_flags & OPT_FSYNC) {
+		fdout_sync = (fdout != -1) && !isatty(fdout);
+		fdtee_sync = (fdtee != -1) && !isatty(fdtee);
+	}
+
 	/*
 	 *  Main loop:
 	 *	read data until buffer is full
@@ -1318,6 +1341,7 @@ int main(int argc, char **argv)
 				ret = EXIT_WRITE_ERROR;
 				goto tidy;
 			}
+			fsync_data(fdout, &fdout_sync);
 		}
 
 		/* -t Tee mode output */
@@ -1336,6 +1360,7 @@ redo_write:
 					goto tidy;
 				}
 			}
+			fsync_data(fdtee, &fdtee_sync);
 		}
 		if (eof)
 			break;
