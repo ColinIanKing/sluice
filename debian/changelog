@@ -1,3 +1,10 @@
+sluice (0.03.00-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Add -F option to fsync data to file
+
+ -- Colin Ian King <colin.i.king@gmail.com>  Thu, 18 Jan 2024 15:57:39 +0000
+
 sluice (0.02.16-1) unstable; urgency=medium
 
   * Makefile: bump version
