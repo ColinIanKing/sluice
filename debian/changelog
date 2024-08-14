@@ -1,3 +1,11 @@
+sluice (0.03.01-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * debian/control: update standards version to 4.7.0
+  * check_max_pipe_size: close pipe fds if fcntl fails
+
+ -- Colin Ian King <colin.i.king@gmail.com>  Wed, 14 Aug 2024 22:14:23 +0100
+
 sluice (0.03.00-1) unstable; urgency=medium
 
   * Makefile: bump version
