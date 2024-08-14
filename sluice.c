@@ -330,8 +330,11 @@ static int check_max_pipe_size(const size_t sz, const size_t page_size)
 	if (pipe(fds) < 0)
 		return -1;
 
-	if (fcntl(fds[0], F_SETPIPE_SZ, sz) < 0)
+	if (fcntl(fds[0], F_SETPIPE_SZ, sz) < 0) {
+		(void)close(fds[0]);
+		(void)close(fds[1]);
 		return -1;
+	}
 
 	(void)close(fds[0]);
 	(void)close(fds[1]);
